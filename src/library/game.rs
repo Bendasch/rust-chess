@@ -23,25 +23,30 @@ pub struct Move {
 
 impl Move {
 
-    fn new(move_string: String) -> Move {
-        assert!(Move::is_valid_move_string(&move_string));
-        let move_chars: Vec<char> = move_string.chars().rev().collect();
-        let row = match move_chars[0].to_digit(10) {
-            Some(row) =>  row,
-            None => panic!("Invalid move!")
-        };
-        let field = Field(move_chars[1], row as u8);
+    fn new(move_string: &mut str) -> Move {
+        
+        // transform to vector of characters and strip newlines or carriage returns
+        let mut move_chars: Vec<char> = move_string.chars().rev().filter(
+            |c| *c != '\n' && *c != '\r'
+        ).collect();
+
+        println!("{:?}", move_chars);
+        let target_field = Move::get_target_field(&mut move_chars);
+        println!("{:?}", move_chars); 
 
         Move { 
             piece: Piece::WhitePawn, 
             start_field: Field('e', 2),
-            target_field: field 
+            target_field: target_field 
         }
     }
 
-    fn is_valid_move_string(move_string: &str) -> bool {
-        move_string.len() < 4
-        // actual logic require later
+    fn get_target_field(move_chars: &mut Vec<char>) -> Field {
+        let row = match move_chars[0].to_digit(10) {
+            Some(row) =>  row,
+            None => panic!("Invalid move!")
+        };
+        Field(move_chars[1], row as u8)
     }
 
 }
@@ -97,15 +102,9 @@ impl<'a> Game<'a> {
     pub fn next_move(&mut self) {
         let mut move_string = String::new();
         io::stdin().read_line(&mut move_string).unwrap();
-        move_string = move_string.trim().to_string();
 
-        let chess_move = Move::new(move_string);
+        let chess_move = Move::new(&mut move_string);
         self.make_move(chess_move);
-    }
-
-    fn is_legal_move(&self, _chess_move: Move) -> bool {
-        // to do
-        true
     }
 
     fn make_move(&mut self, chess_move: Move) {
