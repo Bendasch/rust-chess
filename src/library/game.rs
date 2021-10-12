@@ -23,32 +23,51 @@ pub struct Move {
 
 impl Move {
 
-    fn new(move_string: &mut str) -> Move {
+    fn new(move_string: &mut str, game: &Game) -> Move {
         
         // transform to vector of characters and strip newlines or carriage returns
         let mut move_chars: Vec<char> = move_string.chars().rev().filter(
             |c| *c != '\n' && *c != '\r'
         ).collect();
 
-        println!("{:?}", move_chars);
+        // the last two chars are interpreted as the target field
         let target_field = Move::get_target_field(&mut move_chars);
-        println!("{:?}", move_chars); 
-
+        
+        // the piece and it's field are determined from the rest of the 
+        // move string as well as the current position
+        let (piece, start_field) = Move::get_piece_and_field(&mut move_chars, game);
+        
         Move { 
-            piece: Piece::WhitePawn, 
-            start_field: Field('e', 2),
+            piece: piece, 
+            start_field: start_field,
             target_field: target_field 
         }
     }
 
     fn get_target_field(move_chars: &mut Vec<char>) -> Field {
-        let row = match move_chars[0].to_digit(10) {
+        let row = match move_chars.remove(0).to_digit(10) {
             Some(row) =>  row,
             None => panic!("Invalid move!")
         };
-        Field(move_chars[1], row as u8)
+        Field(move_chars.remove(0), row as u8) 
     }
 
+    fn get_piece_and_field(move_chars: &mut Vec<char>, game: &Game) -> (Piece, Field) {
+        
+        let piece: Piece;
+        let field: Field;
+
+        // if no chars are left, the piece has to be a pawn
+        if move_chars.len() == 0 {
+            if game.turn == Turn::Black {
+                piece = Piece::BlackPawn;
+            } else {
+                piece = Piece::WhitePawn;
+            }
+        }
+
+        (piece, field)
+    }
 }
 pub enum Piece {        
     BlackRook,
@@ -65,8 +84,9 @@ pub enum Piece {
     WhitePawn
 }
 
+struct Position<'a>(&'a str);
 pub struct Game<'a> {
-    position: &'a str,
+    position: Position<'a>,
     turn: Turn,
     castle_availability: CastleAvailability,
     en_passant: Option<Field>,
@@ -91,7 +111,7 @@ impl<'a> Game<'a> {
         }
     }
 
-    pub fn position(&self) -> &'a str {
+    pub fn position(&self) -> Position {
         self.position
     }
 
@@ -103,7 +123,7 @@ impl<'a> Game<'a> {
         let mut move_string = String::new();
         io::stdin().read_line(&mut move_string).unwrap();
 
-        let chess_move = Move::new(&mut move_string);
+        let chess_move = Move::new(&mut move_string, &self);
         self.make_move(chess_move);
     }
 
