@@ -17,49 +17,50 @@ const WHITE_PAWN: char    = '\u{2659}';
 
 pub fn run() {
     let mut game = Game::new();
-    draw_board(&game.position());
+    draw_board(game.position());
     draw_who_to_move(&game.turn());
     game.next_move();
 }
 
-fn draw_board(position: &str) {
-    let split = position.split("/");
+fn draw_board(position: Position) {
+    let split = position.split();
     for line in split {
-        let mut output_row = String::new();
+        let mut output_rank = String::new();
         for char in line.chars() {
             match char {
-                'r' => output_row.push(BLACK_ROOK),
-                'n' => output_row.push(BLACK_KNIGHT),
-                'b' => output_row.push(BLACK_BISHOP),
-                'q' => output_row.push(BLACK_QUEEN),
-                'k' => output_row.push(BLACK_KING),
-                'p' => output_row.push(BLACK_PAWN),
-                'R' => output_row.push(WHITE_ROOK),
-                'N' => output_row.push(WHITE_KNIGHT),
-                'B' => output_row.push(WHITE_BISHOP),
-                'Q' => output_row.push(WHITE_QUEEN),
-                'K' => output_row.push(WHITE_KING),
-                'P' => output_row.push(WHITE_PAWN),
-                '1' => output_row.push_str(" "),
-                '2' => output_row.push_str("  "),
-                '3' => output_row.push_str("   "),
-                '4' => output_row.push_str("    "),
-                '5' => output_row.push_str("     "),
-                '6' => output_row.push_str("      "),
-                '7' => output_row.push_str("       "),
-                '8' => output_row.push_str("        "),
+                'r' => output_rank.push(BLACK_ROOK),
+                'n' => output_rank.push(BLACK_KNIGHT),
+                'b' => output_rank.push(BLACK_BISHOP),
+                'q' => output_rank.push(BLACK_QUEEN),
+                'k' => output_rank.push(BLACK_KING),
+                'p' => output_rank.push(BLACK_PAWN),
+                'R' => output_rank.push(WHITE_ROOK),
+                'N' => output_rank.push(WHITE_KNIGHT),
+                'B' => output_rank.push(WHITE_BISHOP),
+                'Q' => output_rank.push(WHITE_QUEEN),
+                'K' => output_rank.push(WHITE_KING),
+                'P' => output_rank.push(WHITE_PAWN),
+                '1' => output_rank.push_str(" "),
+                '2' => output_rank.push_str("  "),
+                '3' => output_rank.push_str("   "),
+                '4' => output_rank.push_str("    "),
+                '5' => output_rank.push_str("     "),
+                '6' => output_rank.push_str("      "),
+                '7' => output_rank.push_str("       "),
+                '8' => output_rank.push_str("        "),
                 _ => panic!("Board position is corrupt!")
             }
-            output_row.push(' ');
+            output_rank.push(' ');
         }
-        println!("{}", output_row);
+        println!("{}", output_rank);
     }
 }
 
-fn draw_who_to_move(turn: &Turn) {
-    match turn {
-        Turn::Black => println!("Black to move..."),
-        Turn::White => println!("White to move..."),
+fn draw_who_to_move(turn: &Color) {
+    match *turn {
+        Color::Black => println!("Black to move..."),
+        Color::White => println!("White to move..."),
+        _ => return
     }
 }
 
@@ -69,22 +70,23 @@ impl fmt::Display for Field {
     }
 }
 
-
 impl fmt::Display for Piece {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match *self {
-            Piece::BlackRook    => write!(f, "black rook"),
-            Piece::BlackKnight  => write!(f, "black knight"),
-            Piece::BlackBishop  => write!(f, "black bishop"),
-            Piece::BlackQueen   => write!(f, "black queen"), 
-            Piece::BlackKing    => write!(f, "black king"),
-            Piece::BlackPawn    => write!(f, "black pawn"),
-            Piece::WhiteRook    => write!(f, "white rook"),
-            Piece::WhiteKnight  => write!(f, "white knight"),
-            Piece::WhiteBishop  => write!(f, "white bishop"),
-            Piece::WhiteQueen   => write!(f, "white queen"), 
-            Piece::WhiteKing    => write!(f, "white king"),
-            Piece::WhitePawn    => write!(f, "white pawn")
+        
+        let color= match self.color() {
+            Color::Black => "black",
+            Color::White => "white",
+            Color::None => panic!("Corrupt game state - each player needs a color!")
+        };
+
+        match self.piecetype() {
+            PieceType::Rook    => write!(f, "{} rook", color),
+            PieceType::Knight  => write!(f, "{} knight", color),
+            PieceType::Bishop  => write!(f, "{} bishop", color),
+            PieceType::Queen   => write!(f, "{} queen", color), 
+            PieceType::King    => write!(f, "{} king", color),
+            PieceType::Pawn    => write!(f, "{} pawn", color),
+            PieceType::None    => panic!("A piece needs to be selected to move!"),   
         }
     }
 }
