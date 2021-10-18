@@ -19,7 +19,9 @@ pub fn run() {
     let mut game = Game::new();
     draw_board(game.position());
     draw_who_to_move(&game.turn());
-    game.next_move();
+    loop {
+        game.next_move();
+    }
 }
 
 fn draw_board(position: Position) {
