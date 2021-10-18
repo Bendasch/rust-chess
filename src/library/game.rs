@@ -1,7 +1,6 @@
 #![allow(dead_code)]
 use std::io;
 use std::cmp::PartialEq;
-use std::str::Split;
 
 #[derive(PartialEq, Copy, Clone, Debug)]
 pub enum Color {
@@ -51,10 +50,10 @@ impl Move {
     }
 
     // for now we assume the syntax "AABB", where
-    // AA are the indices of the source field (i.e., 52)
-    // BB are the indices of the target field (i.e., 54)
-    // -> 5254 is equivalent to "e4" in standard notation.
-    fn new(move_string: &mut str, game: &Game) -> Move {
+    // AA are the indices of the source field (i.e., 52) [offset by 1]
+    // BB are the indices of the target field (i.e., 54) [offset by 1]   
+    // -> 2545 is equivalent to "e4" in standard notation.
+    fn new(move_string: &mut str, game: &mut Game) -> Move {
         
         // transform to vector of characters and strip newlines or carriage returns
         let move_indices: Vec<usize> = move_string.chars().filter(
@@ -63,11 +62,12 @@ impl Move {
             |c| c.to_digit(10).expect("Faulty move string") as usize
         ).collect();
         
-        let start_field = Field(move_indices[0], move_indices[1]);
+        let start_field = Field(move_indices[0]-1, move_indices[1]-1);
+        let piece = game.position_matrix().unwrap().get_piece_from_field(&start_field);
         Move {
-            piece: game.position_matrix().0.as_ref().unwrap()[start_field.0][start_field.1],
+            piece: *piece,
             start_field: start_field,
-            target_field: Field(move_indices[2], move_indices[3])
+            target_field: Field(move_indices[2]-1, move_indices[3]-1)
         }
     }
 }
@@ -105,28 +105,23 @@ impl<'a> Position<'a> {
     }
 }
 
-pub struct PositionMatrix(Option<Vec<Vec<Piece>>>);
+#[derive(Clone)]
+pub struct PositionMatrix(Vec<Vec<Piece>>);
 
 impl PositionMatrix {
     
     fn has_piece_on_field(&self, field: &Field) -> bool {
-        match &self.0 {
-            Some(matrix) => *matrix[field.0][field.1].piecetype() != PieceType::None, 
-            None => panic!("The matrix should always be prepared at this point!") 
-        }
+        *self.0[field.0][field.1].piecetype() != PieceType::None
     }
 
     fn get_piece_from_field(&self, field: &Field) -> &Piece {
-        match &self.0 {
-            Some(matrix) => &matrix[field.0][field.1], 
-            None => panic!("The matrix should always be prepared at this point!") 
-        }
+        &self.0[field.0][field.1]
     }
 }
 
 pub struct Game<'a> {
     position: Position<'a>,
-    position_matrix: PositionMatrix,
+    position_matrix: Option<PositionMatrix>,
     turn: Color,
     castle_availability: CastleAvailability,
     en_passant: Option<Field>,
@@ -138,7 +133,7 @@ impl<'a> Game<'a> {
     pub fn new() -> Game<'a> {
         Game {
             position: Position("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR"),
-            position_matrix: PositionMatrix(None),
+            position_matrix: None,
             turn: Color::White,
             castle_availability: CastleAvailability { 
                 white_king: true, 
@@ -156,17 +151,17 @@ impl<'a> Game<'a> {
         self.position
     }
 
-    pub fn position_matrix(&self) -> &PositionMatrix {
-        match self.position_matrix.0 {
+    pub fn position_matrix(&mut self) -> &Option<PositionMatrix> {
+        match self.position_matrix {
             Some(_) => &self.position_matrix,
-            None => panic!("position matrix should have been buffered!")
+            None => self.buffer_matrix()
         }
     }
 
-    fn buffer_matrix(&mut self) -> &PositionMatrix {
+    fn buffer_matrix(&mut self) -> &Option<PositionMatrix> {
         let mut matrix: Vec<Vec<Piece>> = Vec::new();
-        let ranks: Vec<String> = self.position.split();
-        for (i, rank) in ranks.enumerate() {
+        let ranks: Vec<&str> = self.position.split();
+        for (i, rank) in ranks.iter().rev().enumerate() {
             matrix.push(Vec::new());
             for char in rank.chars() {
                 match char {
@@ -190,7 +185,7 @@ impl<'a> Game<'a> {
             assert!(matrix[i].len() == 8, "Position matrix doesn't have 8 files\n{:?}", matrix[i]);
         }
         assert!(matrix.len() == 8, "Position matrix doesn't have 8 ranks");
-        self.position_matrix = PositionMatrix(Some(matrix));
+        self.position_matrix = Some(PositionMatrix(matrix));
         &self.position_matrix
     }
 
@@ -218,23 +213,20 @@ impl<'a> Game<'a> {
         io::stdin().read_line(&mut move_string).unwrap();
 
         // execute the players move
-        let chess_move = Move::new(&mut move_string, &self);
+        let chess_move = Move::new(&mut move_string, &mut self);
         self.execute_move(chess_move);
     }
 
-    fn execute_move(&self, chess_move: Move) {
+    fn execute_move(&mut self, chess_move: Move) {
 
-        // (1) destroy enemy piece on the target field
-        // [note that we assume the move to be valid at this point]
-        if self.piece_on_field(chess_move.target_field()) {
-            println!("Hi, there is a piece on this field!");
-        }
+        // 1) remove the piece from it's current field
+        let mut matrix = self.position_matrix().unwrap();
 
-        // (2) place the piece on the field
-        println!("{:?}", chess_move)
+
+        // 2) replace the new field with the piece
     }
 
     fn piece_on_field(&self, field: &Field) -> bool {
-        self.position_matrix().has_piece_on_field(field)
+        self.position_matrix().unwrap().has_piece_on_field(field)
     }
 }

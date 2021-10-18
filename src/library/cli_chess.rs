@@ -17,17 +17,22 @@ const WHITE_PAWN: char    = '\u{2659}';
 
 pub fn run() {
     let mut game = Game::new();
-    draw_board(game.position());
+    draw_board(&game.position());
     draw_who_to_move(&game.turn());
     loop {
         game.next_move();
     }
 }
 
-fn draw_board(position: Position) {
-    let split = position.split();
-    for line in split {
+fn draw_board(position: &Position) {
+    let split: Vec<&str> = position.split();
+    println!("   1 2 3 4 5 6 7 8");
+    println!("  -----------------");
+    for (i, line) in split.iter().enumerate() {
         let mut output_rank = String::new();
+        let rank_index = char::from_digit(8-i as u32, 10).unwrap();
+        output_rank.push(rank_index);
+        output_rank.push_str("| ");
         for char in line.chars() {
             match char {
                 'r' => output_rank.push(BLACK_ROOK),
@@ -42,20 +47,24 @@ fn draw_board(position: Position) {
                 'Q' => output_rank.push(WHITE_QUEEN),
                 'K' => output_rank.push(WHITE_KING),
                 'P' => output_rank.push(WHITE_PAWN),
-                '1' => output_rank.push_str(" "),
-                '2' => output_rank.push_str("  "),
-                '3' => output_rank.push_str("   "),
-                '4' => output_rank.push_str("    "),
-                '5' => output_rank.push_str("     "),
-                '6' => output_rank.push_str("      "),
-                '7' => output_rank.push_str("       "),
-                '8' => output_rank.push_str("        "),
+                '1' => output_rank.push_str("   "),
+                '2' => output_rank.push_str("      "),
+                '3' => output_rank.push_str("         "),
+                '4' => output_rank.push_str("            "),
+                '5' => output_rank.push_str("               "),
+                '6' => output_rank.push_str("                  "),
+                '7' => output_rank.push_str("                     "),
+                '8' => output_rank.push_str("               "),
                 _ => panic!("Board position is corrupt!")
             }
             output_rank.push(' ');
         }
+        output_rank.push_str(" |");
+        output_rank.push(rank_index);
         println!("{}", output_rank);
     }
+    println!("  -----------------");
+    println!("   1 2 3 4 5 6 7 8");
 }
 
 fn draw_who_to_move(turn: &Color) {
