@@ -1,5 +1,6 @@
 use crate::library::game::*;
 use std::fmt;
+use std::cell::*;
 
 const BLACK_ROOK: char    = '\u{265C}';
 const BLACK_KNIGHT: char  = '\u{265E}';
@@ -17,16 +18,18 @@ const WHITE_PAWN: char    = '\u{2659}';
 
 pub fn run() {
     let mut game = Game::new();
-    draw_board(&game.position());
+    draw_board(game.position());
     draw_who_to_move(&game.turn());
     loop {
         game.next_move();
+        draw_board(game.position());
     }
 }
 
-fn draw_board(position: &Position) {
+fn draw_board(position: &RefCell<Position>) {
+    let position = position.borrow();
     let split: Vec<&str> = position.split();
-    println!("   1 2 3 4 5 6 7 8");
+    println!("\n   1 2 3 4 5 6 7 8");
     println!("  -----------------");
     for (i, line) in split.iter().enumerate() {
         let mut output_rank = String::new();
@@ -47,13 +50,13 @@ fn draw_board(position: &Position) {
                 'Q' => output_rank.push(WHITE_QUEEN),
                 'K' => output_rank.push(WHITE_KING),
                 'P' => output_rank.push(WHITE_PAWN),
-                '1' => output_rank.push_str("   "),
-                '2' => output_rank.push_str("      "),
-                '3' => output_rank.push_str("         "),
-                '4' => output_rank.push_str("            "),
-                '5' => output_rank.push_str("               "),
-                '6' => output_rank.push_str("                  "),
-                '7' => output_rank.push_str("                     "),
+                '1' => output_rank.push_str(" "),
+                '2' => output_rank.push_str("   "),
+                '3' => output_rank.push_str("     "),
+                '4' => output_rank.push_str("       "),
+                '5' => output_rank.push_str("         "),
+                '6' => output_rank.push_str("           "),
+                '7' => output_rank.push_str("             "),
                 '8' => output_rank.push_str("               "),
                 _ => panic!("Board position is corrupt!")
             }

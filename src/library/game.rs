@@ -2,6 +2,7 @@
 use std::io;
 use std::cmp::PartialEq;
 use std::cell::RefCell;
+use std::cell::Ref;
 
 #[derive(PartialEq, Copy, Clone, Debug)]
 pub enum Color {
@@ -97,16 +98,49 @@ pub enum PieceType {
     Pawn,
     None
 }
-#[derive(Clone,Copy)]
-pub struct Position<'a>(&'a str);
+#[derive(Clone)]
+pub struct Position(String);
 
-impl<'a> Position<'a> {
+impl <'a> Position {
     pub fn split(&'a self) -> Vec<&'a str> {
         self.0.split("/").collect()
     }
 
-    pub fn update_from_matrix(&mut self) {
-        // TO DO!
+    pub fn update_from_matrix(&mut self, matrix: Ref<PositionMatrix>) {
+        let mut new_position = String::new();
+        let mut new_char: char = ' ';
+        let numbers = vec!['1','2','3','4','5','6','7'];
+        for (index, rank) in matrix.0.iter().rev().enumerate() {
+            for piece in rank {
+                match piece.piecetype {
+                    PieceType::Rook if piece.color == Color::White => new_char = 'R',
+                    PieceType::Rook => new_char = 'r',
+                    PieceType::Knight if piece.color == Color::White => new_char = 'N',
+                    PieceType::Knight => new_char = 'n',
+                    PieceType::Bishop if piece.color == Color::White => new_char = 'B',
+                    PieceType::Bishop => new_char = 'b',
+                    PieceType::Queen if piece.color == Color::White => new_char = 'Q', 
+                    PieceType::Queen => new_char = 'q', 
+                    PieceType::King if piece.color == Color::White => new_char = 'K',
+                    PieceType::King => new_char = 'k',
+                    PieceType::Pawn if piece.color == Color::White => new_char = 'P',
+                    PieceType::Pawn => new_char = 'p',
+                    PieceType::None => {
+                        if numbers.iter().any(|n| n==&new_char) {
+                            new_char = char::from_digit(new_position.pop().unwrap().to_digit(10).unwrap() + 1 as u32, 10).unwrap();
+                        } else {
+                            new_char = '1';
+                        }
+                    }
+                }
+                new_position.push(new_char);
+            }
+            if index < rank.len() - 1 {
+                new_char = '/';
+                new_position.push(new_char);
+            }
+        }
+        self.0 = new_position;
     }
 }
 
@@ -132,8 +166,8 @@ impl PositionMatrix {
     }
 }
 
-pub struct Game<'a> {
-    position: Position<'a>,
+pub struct Game {
+    position: RefCell<Position>,
     position_matrix:  RefCell<PositionMatrix>,
     turn: Color,
     castle_availability: CastleAvailability,
@@ -142,12 +176,12 @@ pub struct Game<'a> {
     fullmove_clock: u16
 }
 
-impl<'a> Game<'a> {
-    pub fn new() -> Game<'a> {
-        let start_position = Position("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR");
+impl<'a> Game {
+    pub fn new() -> Game {
+        let start_string = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR";
         Game {
-            position: start_position,
-            position_matrix: Game::init_matrix(&start_position),
+            position: RefCell::new(Position(String::from(start_string))),
+            position_matrix: Game::init_matrix(&Position(String::from(start_string))),
             turn: Color::White,
             castle_availability: CastleAvailability { 
                 white_king: true, 
@@ -161,8 +195,8 @@ impl<'a> Game<'a> {
         }
     }
 
-    pub fn position(&self) -> Position {
-        self.position
+    pub fn position(&'a self) -> &RefCell<Position> {
+        &self.position
     }
 
     pub fn position_matrix(&self) -> &RefCell<PositionMatrix> {
@@ -224,7 +258,7 @@ impl<'a> Game<'a> {
         self.execute_move(chess_move);
 
         // parse position string
-        self.position.update_from_matrix();
+        self.position().borrow_mut().update_from_matrix(self.position_matrix().borrow());
     }
 
     fn execute_move(&mut self, chess_move: Move) {
@@ -249,7 +283,7 @@ mod tests {
     #[test]
     fn new_game() {
         let game = Game::new();
-        assert_eq!(game.position().0, "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR");
+        assert_eq!(game.position().borrow().0, "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR");
         assert!(game.position_matrix().borrow().0[0][0] == Piece{color: Color::White, piecetype: PieceType::Rook});
         assert!(game.position_matrix().borrow().0[0][1] == Piece{color: Color::White, piecetype: PieceType::Knight});
         assert!(game.position_matrix().borrow().0[0][2] == Piece{color: Color::White, piecetype: PieceType::Bishop});
@@ -312,12 +346,33 @@ mod tests {
     fn matrix_execute_move() {
 
         let mut game = Game::new();
-        let mut move_string = String::from("7363");
+        let mut move_string = String::from("2545");
         let chess_move = Move::new(&mut move_string, &mut game);
-        let mut move_string = String::from("7363");
+        let mut move_string = String::from("2545");
         let chess_move_check = Move::new(&mut move_string, &mut game);
 
         game.execute_move(chess_move);
         assert_eq!(game.position_matrix().borrow().0[chess_move_check.target_field.0][chess_move_check.target_field.1], chess_move_check.piece);
+    }
+
+    #[test]
+    fn update_position_from_matrix() {
+
+        let mut game = Game::new();
+        assert_eq!(game.position().borrow().0, "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR");
+        
+        // make a move 
+        let mut move_string = String::from("2545");
+        let chess_move = Move::new(&mut move_string, &mut game);
+        game.execute_move(chess_move);
+        game.position().borrow_mut().update_from_matrix(game.position_matrix().borrow());
+        assert_eq!(game.position().borrow().0, "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR");
+
+        // make another move        
+        let mut move_string = String::from("8263");
+        let chess_move = Move::new(&mut move_string, &mut game);
+        game.execute_move(chess_move);
+        game.position().borrow_mut().update_from_matrix(game.position_matrix().borrow());
+        assert_eq!(game.position().borrow().0, "r1bqkbnr/pppppppp/2n5/8/4P3/8/PPPP1PPP/RNBQKBNR");
     }
 }
