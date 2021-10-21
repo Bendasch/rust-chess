@@ -75,13 +75,21 @@ impl Move {
         ).map(
             |c| c.to_digit(10).expect("Faulty move string") as usize
         ).collect();
+
+        // assert that the moves are within the bounds of the field
+        assert!(1 <= move_indices[0] && move_indices[0] <= 8);
+        assert!(1 <= move_indices[1] && move_indices[1] <= 8);
+        assert!(1 <= move_indices[2] && move_indices[2] <= 8);
+        assert!(1 <= move_indices[3] && move_indices[3] <= 8);
         
         let start_field = Field(move_indices[0]-1, move_indices[1]-1);
+        let target_field = Field(move_indices[2]-1, move_indices[3]-1);
+
         let piece = game.position_matrix().borrow().get_piece_from_field(&start_field);
         Move {
             piece: piece,
             start_field: start_field,
-            target_field: Field(move_indices[2]-1, move_indices[3]-1)
+            target_field: target_field
         }
     }
 }
@@ -269,7 +277,8 @@ impl<'a> Game {
         // execute the players move
         let chess_move = Move::new(&mut move_string, self);
         if !self.move_is_legal(&chess_move) { panic!(
-                "Illegal move. {} cant move from {:?} to {:?}", 
+                "Illegal move. {:?} cant move {} from {:?} to {:?}", 
+                self.turn(),
                 chess_move.piece_string(), 
                 chess_move.start_field(), 
                 chess_move.target_field()
@@ -282,7 +291,60 @@ impl<'a> Game {
     }
     
     fn move_is_legal(&mut self, chess_move: &Move) -> bool {
-        return true;
+
+        // assert that a piece was selected
+        if chess_move.piece().piecetype() == &PieceType::None || chess_move.piece().color() == &Color::None {
+            return false;
+        }
+
+        // assert that the piece has the proper color
+        if !self.is_players_turn(&chess_move.piece().color()) {
+            return false;
+        }
+        
+        // assert that the piece is allowed to move from the start to the target field 
+        // this includes asserting that castling or en-passant are available
+        if !self.piece_can_reach_target_field(&chess_move) { 
+            return false;
+        }
+
+        // assert that none of the player's own pieces are on the target field
+
+        // assert that the way to the target field is not blocked
+
+        // assert that the player's king is not in check after the planned move
+        // this both prevents pieces moving from pins and moves during checks which don't stop those checks
+        
+        // in case of castling, assert that the kings does not need to move through check
+
+        true
+    }
+
+    fn is_players_turn(&self, turn: &Color) -> bool {
+        return self.turn() == turn
+    }
+
+    fn piece_can_reach_target_field(&self, chess_move: &Move) -> bool {
+        
+        let rank_diff: isize = chess_move.target_field().0 as isize - chess_move.start_field().0 as isize;
+        let file_diff: isize = chess_move.target_field().1 as isize - chess_move.start_field().1 as isize;
+        let rank_diff_abs = isize::abs(rank_diff);
+        let file_diff_abs = isize::abs(file_diff);
+
+        match chess_move.piece().piecetype() {
+            PieceType::Rook => (rank_diff == 0) ^ (file_diff == 0),
+            PieceType::Knight => (rank_diff_abs == 1 && file_diff_abs == 2) || (rank_diff_abs == 2 && file_diff_abs == 1),
+            PieceType::Bishop => (rank_diff == file_diff) && (rank_diff != 0),
+            PieceType::Queen => ((rank_diff == file_diff) && (rank_diff != 0)) || ((rank_diff == 0) ^ (file_diff == 0)), 
+            PieceType::King => rank_diff_abs <= 1 && file_diff_abs <= 1 && (rank_diff_abs + file_diff_abs) >= 1,
+            PieceType::Pawn if chess_move.piece().color() == &Color::White => { 
+                (rank_diff == 1 && file_diff_abs <= 1) || (rank_diff == 2 && chess_move.start_field().0 == 1 && file_diff == 0)
+            },
+            PieceType::Pawn if chess_move.piece().color() == &Color::Black => { 
+                (rank_diff == -1 && file_diff_abs <= 1) || (rank_diff == -2 && chess_move.start_field().0 == 6 && file_diff == 0)
+            },
+            _ => panic!("Move not properly processed. {:?}", chess_move) 
+        }
     }
 
     fn execute_move(&mut self, chess_move: Move) {
@@ -292,10 +354,21 @@ impl<'a> Game {
     
         // 2) replace the new field with the piece
         self.position_matrix().borrow_mut().place_piece(chess_move.piece, chess_move.target_field);
+
+        // 3) Change the turn
+        self.toggle_turn();
     }
 
     fn piece_on_field(&self, field: &Field) -> bool {
         self.position_matrix().borrow().has_piece_on_field(field)
+    }
+
+    fn toggle_turn(&mut self) {
+        if self.turn == Color::White {
+            self.turn = Color::Black;
+        } else {
+            self.turn = Color::White;
+        }
     }
 }
 
@@ -404,8 +477,72 @@ mod tests {
     #[test]
     fn move_is_legal() {
         let mut game = Game::new();
-        let mut move_string = String::from("8263");
+
+        // legal move
+        let mut move_string = String::from("1233");
         let legal_move = Move::new(&mut move_string, &mut game);
         assert!(game.move_is_legal(&legal_move));
+
+        // illegal move
+        let mut move_string = String::from("8263");
+        let illegal_move = Move::new(&mut move_string, &mut game);
+        assert!(!game.move_is_legal(&illegal_move));        
+    }
+
+    #[test]
+    fn is_players_turn() {
+        let game = Game::new();
+        assert!(game.is_players_turn(&Color::White));
+        assert!(!game.is_players_turn(&Color::Black));
+    }
+
+    #[test]
+    fn pawn_can_reach_target_field() {       
+        let mut game = Game::new();
+        
+        // single up        
+        let mut move_string = String::from("2535");
+        let chess_move = Move::new(&mut move_string, &mut game);   
+        assert!(game.piece_can_reach_target_field(&chess_move));
+    
+        // double up
+        let mut move_string = String::from("2545");
+        let chess_move = Move::new(&mut move_string, &mut game);   
+        assert!(game.piece_can_reach_target_field(&chess_move));
+
+        // single vertical up
+        let mut move_string = String::from("2534");
+        let chess_move = Move::new(&mut move_string, &mut game);   
+        assert!(game.piece_can_reach_target_field(&chess_move));
+
+        // single down
+        let mut move_string = String::from("7555");
+        let chess_move = Move::new(&mut move_string, &mut game);   
+        assert!(game.piece_can_reach_target_field(&chess_move));
+
+        // double down
+        let mut move_string = String::from("7555");
+        let chess_move = Move::new(&mut move_string, &mut game);   
+        assert!(game.piece_can_reach_target_field(&chess_move));
+        
+        // single vertical down
+        let mut move_string = String::from("7564");
+        let chess_move = Move::new(&mut move_string, &mut game);   
+        assert!(game.piece_can_reach_target_field(&chess_move));
+
+        // three up (should fail!)
+        let mut move_string = String::from("2656");
+        let chess_move = Move::new(&mut move_string, &mut game);   
+        assert!(!game.piece_can_reach_target_field(&chess_move));
+
+        // two up one to the side (should fail!)
+        let mut move_string = String::from("2142");
+        let chess_move = Move::new(&mut move_string, &mut game);   
+        assert!(!game.piece_can_reach_target_field(&chess_move));
+
+        // one down two to the side (should fail!)
+        let mut move_string = String::from("7765");
+        let chess_move = Move::new(&mut move_string, &mut game);   
+        assert!(!game.piece_can_reach_target_field(&chess_move));
     }
 }
