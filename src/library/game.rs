@@ -51,6 +51,18 @@ impl Move {
         &self.target_field
     }
 
+    pub fn piece_string(&self) -> String {
+        match self.piece.piecetype() {
+            PieceType::Rook     => String::from("Rook"),
+            PieceType::Knight   => String::from("Knight"),
+            PieceType::Bishop   => String::from("Bishop"),
+            PieceType::Queen    => String::from("Queen"), 
+            PieceType::King     => String::from("King"),
+            PieceType::Pawn     => String::from("Pawn"),
+            PieceType::None     => String::from("Empty field")            
+        }
+    }
+
     // for now we assume the syntax "AABB", where
     // AA are the indices of the source field (i.e., 52) [offset by 1]
     // BB are the indices of the target field (i.e., 54) [offset by 1]   
@@ -88,6 +100,7 @@ impl Piece {
         &self.piecetype
     }
 }
+
 #[derive(PartialEq, Copy, Clone, Debug)]
 pub enum PieceType {
     Rook,
@@ -255,10 +268,21 @@ impl<'a> Game {
 
         // execute the players move
         let chess_move = Move::new(&mut move_string, self);
+        if !self.move_is_legal(&chess_move) { panic!(
+                "Illegal move. {} cant move from {:?} to {:?}", 
+                chess_move.piece_string(), 
+                chess_move.start_field(), 
+                chess_move.target_field()
+        );}
+
         self.execute_move(chess_move);
 
         // parse position string
         self.position().borrow_mut().update_from_matrix(self.position_matrix().borrow());
+    }
+    
+    fn move_is_legal(&mut self, chess_move: &Move) -> bool {
+        return true;
     }
 
     fn execute_move(&mut self, chess_move: Move) {
@@ -367,12 +391,21 @@ mod tests {
         game.execute_move(chess_move);
         game.position().borrow_mut().update_from_matrix(game.position_matrix().borrow());
         assert_eq!(game.position().borrow().0, "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR");
-
+        
         // make another move        
         let mut move_string = String::from("8263");
         let chess_move = Move::new(&mut move_string, &mut game);
         game.execute_move(chess_move);
         game.position().borrow_mut().update_from_matrix(game.position_matrix().borrow());
         assert_eq!(game.position().borrow().0, "r1bqkbnr/pppppppp/2n5/8/4P3/8/PPPP1PPP/RNBQKBNR");
+    }
+    
+
+    #[test]
+    fn move_is_legal() {
+        let mut game = Game::new();
+        let mut move_string = String::from("8263");
+        let legal_move = Move::new(&mut move_string, &mut game);
+        assert!(game.move_is_legal(&legal_move));
     }
 }
