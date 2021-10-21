@@ -6,4 +6,4 @@
 * AI making legal moves
 * Give feedback on illegal moves
 * OpenGL support
-* Vulkan tutorial
+* Vulkan support
