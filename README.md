@@ -1,5 +1,5 @@
 # DOING
-* Check move validity
+Assertion that the inserted move is legal
 
 # TODO
 - [x] Assert that a proper piece was selected (no empty field, right color)
@@ -13,9 +13,9 @@
 - [ ] Assert that the king doesn't move through check when castling
 
 # BACKLOG
+* Import / export positions (this will make unit tests 10x better!)
 * Checkmate and stalemate
 * AI making legal moves
-* Import / export positions
 * Don't panic on legal moves!
 * OpenGL support
 * Vulkan support
