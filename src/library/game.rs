@@ -206,21 +206,75 @@ pub struct Game {
 }
 
 impl<'a> Game {
+
     pub fn new() -> Game {
-        let start_string = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR";
+        let fen_start_string = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+        Game::load_game_from_fen(fen_start_string)    
+    }
+
+    pub fn load_game_from_fen(fen_string: &str) -> Game {
+        
+        let game_state_vec: Vec<&str> = fen_string.split(' ').collect();
+        
+        let turn: Color = match game_state_vec[1] {
+            "w" => Color::White,
+            "b" => Color::Black,
+            _ => panic!("Invalid FEN string, turn value: {}", game_state_vec[1])
+        };
+
+        let mut en_passant: Option<Field> = None;
+        if game_state_vec[2].len() > 2 {
+            panic!("Invalid FEN string, en-passant value: {}", game_state_vec[2])
+        } else if game_state_vec[2] != "-" {
+            let mut field: Field = Field(9,9);
+            let en_passant_chars: Vec<char> = game_state_vec[2].chars().collect();
+            match en_passant_chars[0] {
+                'a' => field.0 = 0,
+                'b' => field.0 = 1,
+                'c' => field.0 = 2,
+                'd' => field.0 = 3,
+                'e' => field.0 = 4,
+                'f' => field.0 = 5,
+                'g' => field.0 = 6,
+                'h' => field.0 = 7,
+                _ => panic!("Invalid FEN string, en-passant value: {}", game_state_vec[2])
+            }
+            field.1 = en_passant_chars[1].to_digit(10).unwrap() as usize;
+            
+            en_passant = Some(field);
+        }
+
+        let halfmove_clock: u16 = game_state_vec[3].chars().next().unwrap().to_digit(10).unwrap() as u16;
+        let fullmove_clock: u16 = game_state_vec[4].chars().next().unwrap().to_digit(10).unwrap() as u16;
+
+        let castle_availability: CastleAvailability = match game_state_vec[2] {
+            "KQkq" => CastleAvailability{white_king: true, white_queen: true, black_king: true, black_queen: true},
+            "KQk"  => CastleAvailability{white_king: true, white_queen: true, black_king: true, black_queen: false},
+            "KQq"  => CastleAvailability{white_king: true, white_queen: true, black_king: false, black_queen: true},
+            "KQ"   => CastleAvailability{white_king: true, white_queen: true, black_king: false, black_queen: false},
+            "Kkq"  => CastleAvailability{white_king: true, white_queen: false, black_king: true, black_queen: true},
+            "Kk"   => CastleAvailability{white_king: true, white_queen: false, black_king: true, black_queen: false},
+            "Kq"   => CastleAvailability{white_king: true, white_queen: false, black_king: false, black_queen: true},
+            "K"    => CastleAvailability{white_king: true, white_queen: false, black_king: false, black_queen: false},
+            "Qkq"  => CastleAvailability{white_king: false, white_queen: true, black_king: true, black_queen: true},
+            "Qk"   => CastleAvailability{white_king: false, white_queen: true, black_king: true, black_queen: false},
+            "Qq"   => CastleAvailability{white_king: false, white_queen: true, black_king: false, black_queen: true},
+            "Q"    => CastleAvailability{white_king: false, white_queen: true, black_king: false, black_queen: false},
+            "kq"   => CastleAvailability{white_king: false, white_queen: false, black_king: true, black_queen: true},
+            "k"    => CastleAvailability{white_king: false, white_queen: false, black_king: true, black_queen: false},
+            "q"    => CastleAvailability{white_king: false, white_queen: false, black_king: false, black_queen: true},
+            "-"    => CastleAvailability{white_king: false, white_queen: false, black_king: false, black_queen: false},
+            _ => panic!("Invalid FEN string, castle availability value: {}", game_state_vec[2])
+        };
+
         Game {
-            position: RefCell::new(Position(String::from(start_string))),
-            position_matrix: Game::init_matrix(&Position(String::from(start_string))),
-            turn: Color::White,
-            castle_availability: CastleAvailability { 
-                white_king: true, 
-                white_queen: true, 
-                black_king: true, 
-                black_queen: true 
-            },
-            en_passant: None,
-            halfmove_clock: 0,
-            fullmove_clock: 1
+            position: RefCell::new(Position(String::from(game_state_vec[0]))),
+            position_matrix: Game::init_matrix(&Position(String::from(game_state_vec[0]))),
+            turn,
+            castle_availability,
+            en_passant,
+            halfmove_clock,
+            fullmove_clock
         }
     }
 

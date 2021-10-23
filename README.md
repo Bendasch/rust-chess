@@ -1,19 +1,20 @@
 # DOING
-Assertion that the inserted move is legal
+* Assertion that the inserted move is legal
+* Import / export positions (-> 10x better unit tests!)
 
 # TODO
 - [x] Assert that a proper piece was selected (no empty field, right color)
+- [x] Unit tests for target reach check for pieces other than pawns
 - [x] Assert that the selected piece can in principle reach the target field
 - [x] Handle en-passant and castling in the move check
-- [ ] Implement en-passant and castling in the move execution
-- [ ] Unit tests for target reach check for pieces other than pawns
-- [ ] Assert that player's piece is not yet on the field
+- [x] Assert that player's piece is not yet on the field
+- [ ] Test the FEN -> game conversion method
 - [ ] Assert that the way to the target field is not blocked
 - [ ] Assert that the move will not result in the player being in check
 - [ ] Assert that the king doesn't move through check when castling
+- [ ] Implement en-passant and castling in the move execution
 
 # BACKLOG
-* Import / export positions (this will make unit tests 10x better!)
 * Checkmate and stalemate
 * AI making legal moves
 * Don't panic on legal moves!
