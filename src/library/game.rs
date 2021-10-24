@@ -211,7 +211,7 @@ impl<'a> Game {
         let fen_start_string = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
         Game::load_game_from_fen(fen_start_string)    
     }
-
+    
     pub fn load_game_from_fen(fen_string: &str) -> Game {
         
         let game_state_vec: Vec<&str> = fen_string.split(' ').collect();
@@ -221,32 +221,7 @@ impl<'a> Game {
             "b" => Color::Black,
             _ => panic!("Invalid FEN string, turn value: {}", game_state_vec[1])
         };
-
-        let mut en_passant: Option<Field> = None;
-        if game_state_vec[2].len() > 2 {
-            panic!("Invalid FEN string, en-passant value: {}", game_state_vec[2])
-        } else if game_state_vec[2] != "-" {
-            let mut field: Field = Field(9,9);
-            let en_passant_chars: Vec<char> = game_state_vec[2].chars().collect();
-            match en_passant_chars[0] {
-                'a' => field.0 = 0,
-                'b' => field.0 = 1,
-                'c' => field.0 = 2,
-                'd' => field.0 = 3,
-                'e' => field.0 = 4,
-                'f' => field.0 = 5,
-                'g' => field.0 = 6,
-                'h' => field.0 = 7,
-                _ => panic!("Invalid FEN string, en-passant value: {}", game_state_vec[2])
-            }
-            field.1 = en_passant_chars[1].to_digit(10).unwrap() as usize;
-            
-            en_passant = Some(field);
-        }
-
-        let halfmove_clock: u16 = game_state_vec[3].chars().next().unwrap().to_digit(10).unwrap() as u16;
-        let fullmove_clock: u16 = game_state_vec[4].chars().next().unwrap().to_digit(10).unwrap() as u16;
-
+        
         let castle_availability: CastleAvailability = match game_state_vec[2] {
             "KQkq" => CastleAvailability{white_king: true, white_queen: true, black_king: true, black_queen: true},
             "KQk"  => CastleAvailability{white_king: true, white_queen: true, black_king: true, black_queen: false},
@@ -266,6 +241,31 @@ impl<'a> Game {
             "-"    => CastleAvailability{white_king: false, white_queen: false, black_king: false, black_queen: false},
             _ => panic!("Invalid FEN string, castle availability value: {}", game_state_vec[2])
         };
+
+        let mut en_passant: Option<Field> = None;
+        if game_state_vec[3].len() > 2 {
+            panic!("Invalid FEN string, en-passant value: {}", game_state_vec[3])
+        } else if game_state_vec[3] != "-" {
+            let mut field: Field = Field(9,9);
+            let en_passant_chars: Vec<char> = game_state_vec[3].chars().collect();
+            match en_passant_chars[0] {
+                'a' => field.1 = 0,
+                'b' => field.1 = 1,
+                'c' => field.1 = 2,
+                'd' => field.1 = 3,
+                'e' => field.1 = 4,
+                'f' => field.1 = 5,
+                'g' => field.1 = 6,
+                'h' => field.1 = 7,
+                _ => panic!("Invalid FEN string, en-passant value: {}", game_state_vec[3])
+            }
+            field.0 = (en_passant_chars[1].to_digit(10).unwrap() - 1) as usize;
+            
+            en_passant = Some(field);
+        }
+
+        let halfmove_clock: u16 = game_state_vec[4].parse::<u16>().unwrap();
+        let fullmove_clock: u16 = game_state_vec[5].parse::<u16>().unwrap();
 
         Game {
             position: RefCell::new(Position(String::from(game_state_vec[0]))),
@@ -482,38 +482,38 @@ mod tests {
     fn new_game() {
         let game = Game::new();
         assert_eq!(game.position().borrow().0, "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR");
-        assert!(game.position_matrix().borrow().0[0][0] == Piece{color: Color::White, piecetype: PieceType::Rook});
-        assert!(game.position_matrix().borrow().0[0][1] == Piece{color: Color::White, piecetype: PieceType::Knight});
-        assert!(game.position_matrix().borrow().0[0][2] == Piece{color: Color::White, piecetype: PieceType::Bishop});
-        assert!(game.position_matrix().borrow().0[0][3] == Piece{color: Color::White, piecetype: PieceType::Queen});
-        assert!(game.position_matrix().borrow().0[0][4] == Piece{color: Color::White, piecetype: PieceType::King});
-        assert!(game.position_matrix().borrow().0[0][5] == Piece{color: Color::White, piecetype: PieceType::Bishop});
-        assert!(game.position_matrix().borrow().0[0][6] == Piece{color: Color::White, piecetype: PieceType::Knight});
-        assert!(game.position_matrix().borrow().0[0][7] == Piece{color: Color::White, piecetype: PieceType::Rook});
-        assert!(game.position_matrix().borrow().0[1][0] == Piece{color: Color::White, piecetype: PieceType::Pawn});
-        assert!(game.position_matrix().borrow().0[1][1] == Piece{color: Color::White, piecetype: PieceType::Pawn});
-        assert!(game.position_matrix().borrow().0[1][2] == Piece{color: Color::White, piecetype: PieceType::Pawn});
-        assert!(game.position_matrix().borrow().0[1][3] == Piece{color: Color::White, piecetype: PieceType::Pawn});
-        assert!(game.position_matrix().borrow().0[1][4] == Piece{color: Color::White, piecetype: PieceType::Pawn});
-        assert!(game.position_matrix().borrow().0[1][5] == Piece{color: Color::White, piecetype: PieceType::Pawn});
-        assert!(game.position_matrix().borrow().0[1][6] == Piece{color: Color::White, piecetype: PieceType::Pawn});
-        assert!(game.position_matrix().borrow().0[1][7] == Piece{color: Color::White, piecetype: PieceType::Pawn});        
-        assert!(game.position_matrix().borrow().0[6][0] == Piece{color: Color::Black, piecetype: PieceType::Pawn});
-        assert!(game.position_matrix().borrow().0[6][1] == Piece{color: Color::Black, piecetype: PieceType::Pawn});
-        assert!(game.position_matrix().borrow().0[6][2] == Piece{color: Color::Black, piecetype: PieceType::Pawn});
-        assert!(game.position_matrix().borrow().0[6][3] == Piece{color: Color::Black, piecetype: PieceType::Pawn});
-        assert!(game.position_matrix().borrow().0[6][4] == Piece{color: Color::Black, piecetype: PieceType::Pawn});
-        assert!(game.position_matrix().borrow().0[6][5] == Piece{color: Color::Black, piecetype: PieceType::Pawn});
-        assert!(game.position_matrix().borrow().0[6][6] == Piece{color: Color::Black, piecetype: PieceType::Pawn});
-        assert!(game.position_matrix().borrow().0[6][7] == Piece{color: Color::Black, piecetype: PieceType::Pawn});        
-        assert!(game.position_matrix().borrow().0[7][0] == Piece{color: Color::Black, piecetype: PieceType::Rook});
-        assert!(game.position_matrix().borrow().0[7][1] == Piece{color: Color::Black, piecetype: PieceType::Knight});
-        assert!(game.position_matrix().borrow().0[7][2] == Piece{color: Color::Black, piecetype: PieceType::Bishop});
-        assert!(game.position_matrix().borrow().0[7][3] == Piece{color: Color::Black, piecetype: PieceType::Queen});
-        assert!(game.position_matrix().borrow().0[7][4] == Piece{color: Color::Black, piecetype: PieceType::King});
-        assert!(game.position_matrix().borrow().0[7][5] == Piece{color: Color::Black, piecetype: PieceType::Bishop});
-        assert!(game.position_matrix().borrow().0[7][6] == Piece{color: Color::Black, piecetype: PieceType::Knight});
-        assert!(game.position_matrix().borrow().0[7][7] == Piece{color: Color::Black, piecetype: PieceType::Rook});
+        assert_eq!(game.position_matrix().borrow().0[0][0], Piece{color: Color::White, piecetype: PieceType::Rook});
+        assert_eq!(game.position_matrix().borrow().0[0][1], Piece{color: Color::White, piecetype: PieceType::Knight});
+        assert_eq!(game.position_matrix().borrow().0[0][2], Piece{color: Color::White, piecetype: PieceType::Bishop});
+        assert_eq!(game.position_matrix().borrow().0[0][3], Piece{color: Color::White, piecetype: PieceType::Queen});
+        assert_eq!(game.position_matrix().borrow().0[0][4], Piece{color: Color::White, piecetype: PieceType::King});
+        assert_eq!(game.position_matrix().borrow().0[0][5], Piece{color: Color::White, piecetype: PieceType::Bishop});
+        assert_eq!(game.position_matrix().borrow().0[0][6], Piece{color: Color::White, piecetype: PieceType::Knight});
+        assert_eq!(game.position_matrix().borrow().0[0][7], Piece{color: Color::White, piecetype: PieceType::Rook});
+        assert_eq!(game.position_matrix().borrow().0[1][0], Piece{color: Color::White, piecetype: PieceType::Pawn});
+        assert_eq!(game.position_matrix().borrow().0[1][1], Piece{color: Color::White, piecetype: PieceType::Pawn});
+        assert_eq!(game.position_matrix().borrow().0[1][2], Piece{color: Color::White, piecetype: PieceType::Pawn});
+        assert_eq!(game.position_matrix().borrow().0[1][3], Piece{color: Color::White, piecetype: PieceType::Pawn});
+        assert_eq!(game.position_matrix().borrow().0[1][4], Piece{color: Color::White, piecetype: PieceType::Pawn});
+        assert_eq!(game.position_matrix().borrow().0[1][5], Piece{color: Color::White, piecetype: PieceType::Pawn});
+        assert_eq!(game.position_matrix().borrow().0[1][6], Piece{color: Color::White, piecetype: PieceType::Pawn});
+        assert_eq!(game.position_matrix().borrow().0[1][7], Piece{color: Color::White, piecetype: PieceType::Pawn});        
+        assert_eq!(game.position_matrix().borrow().0[6][0], Piece{color: Color::Black, piecetype: PieceType::Pawn});
+        assert_eq!(game.position_matrix().borrow().0[6][1], Piece{color: Color::Black, piecetype: PieceType::Pawn});
+        assert_eq!(game.position_matrix().borrow().0[6][2], Piece{color: Color::Black, piecetype: PieceType::Pawn});
+        assert_eq!(game.position_matrix().borrow().0[6][3], Piece{color: Color::Black, piecetype: PieceType::Pawn});
+        assert_eq!(game.position_matrix().borrow().0[6][4], Piece{color: Color::Black, piecetype: PieceType::Pawn});
+        assert_eq!(game.position_matrix().borrow().0[6][5], Piece{color: Color::Black, piecetype: PieceType::Pawn});
+        assert_eq!(game.position_matrix().borrow().0[6][6], Piece{color: Color::Black, piecetype: PieceType::Pawn});
+        assert_eq!(game.position_matrix().borrow().0[6][7], Piece{color: Color::Black, piecetype: PieceType::Pawn});        
+        assert_eq!(game.position_matrix().borrow().0[7][0], Piece{color: Color::Black, piecetype: PieceType::Rook});
+        assert_eq!(game.position_matrix().borrow().0[7][1], Piece{color: Color::Black, piecetype: PieceType::Knight});
+        assert_eq!(game.position_matrix().borrow().0[7][2], Piece{color: Color::Black, piecetype: PieceType::Bishop});
+        assert_eq!(game.position_matrix().borrow().0[7][3], Piece{color: Color::Black, piecetype: PieceType::Queen});
+        assert_eq!(game.position_matrix().borrow().0[7][4], Piece{color: Color::Black, piecetype: PieceType::King});
+        assert_eq!(game.position_matrix().borrow().0[7][5], Piece{color: Color::Black, piecetype: PieceType::Bishop});
+        assert_eq!(game.position_matrix().borrow().0[7][6], Piece{color: Color::Black, piecetype: PieceType::Knight});
+        assert_eq!(game.position_matrix().borrow().0[7][7], Piece{color: Color::Black, piecetype: PieceType::Rook});
     }
 
     #[test]
@@ -909,4 +909,89 @@ mod tests {
     
     #[test]
     fn queen_has_path_to_target_field() {}
+
+
+    /*
+        position: RefCell<Position>,
+        position_matrix:  RefCell<PositionMatrix>,
+        turn: Color,
+        castle_availability: CastleAvailability,
+        en_passant: Option<Field>,
+        halfmove_clock: u16,
+        fullmove_clock: u16
+     */
+    #[test]
+    fn load_game_from_fen_new() {
+        let fen_start_string = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+        let game = Game::load_game_from_fen(fen_start_string);           
+        assert_eq!(game.position().borrow().0, "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR");
+        assert_eq!(game.turn, Color::White);
+        assert!(game.castle_availability().white_king);
+        assert!(game.castle_availability().white_queen);
+        assert!(game.castle_availability().black_king);
+        assert!(game.castle_availability().black_queen);
+        assert_eq!(game.en_passant, None);
+        assert_eq!(game.halfmove_clock, 0);
+        assert_eq!(game.fullmove_clock, 1);
+    }
+
+    #[test]
+    fn load_game_from_fen_sicilian_alapin() {
+        let fen_start_string = "rnbqkbnr/pp1ppppp/8/2p5/4P3/2P5/PP1P1PPP/RNBQKBNR b KQkq - 0 2";
+        let game = Game::load_game_from_fen(fen_start_string);           
+        assert_eq!(game.position().borrow().0, "rnbqkbnr/pp1ppppp/8/2p5/4P3/2P5/PP1P1PPP/RNBQKBNR");
+        assert_eq!(game.turn, Color::Black);
+        assert!(game.castle_availability().white_king);
+        assert!(game.castle_availability().white_queen);
+        assert!(game.castle_availability().black_king);
+        assert!(game.castle_availability().black_queen);
+        assert_eq!(game.en_passant, None);
+        assert_eq!(game.halfmove_clock, 0);
+        assert_eq!(game.fullmove_clock, 2);
+    }
+    
+    #[test]
+    fn load_game_from_fen_hikaru_harikrishna() {
+        let fen_start_string = "r6k/1p1q3p/3r1pp1/b1R1N3/p2PQ3/P5P1/1P3P1P/3R2K1 b - - 0 28";
+        let game = Game::load_game_from_fen(fen_start_string);           
+        assert_eq!(game.position().borrow().0, "r6k/1p1q3p/3r1pp1/b1R1N3/p2PQ3/P5P1/1P3P1P/3R2K1");
+        assert_eq!(game.turn, Color::Black);
+        assert!(!game.castle_availability().white_king);
+        assert!(!game.castle_availability().white_queen);
+        assert!(!game.castle_availability().black_king);
+        assert!(!game.castle_availability().black_queen);
+        assert_eq!(game.en_passant, None);
+        assert_eq!(game.halfmove_clock, 0);
+        assert_eq!(game.fullmove_clock, 28);
+    }
+
+    #[test]
+    fn load_game_from_fen_pirc_w_en_passant() {
+        let fen_start_string = "rnbqkb1r/pp3ppp/3p1n2/2pPp3/4P3/2N5/PPP2PPP/R1BQKBNR w KQkq c6 0 5";
+        let game = Game::load_game_from_fen(fen_start_string);           
+        assert_eq!(game.position().borrow().0, "rnbqkb1r/pp3ppp/3p1n2/2pPp3/4P3/2N5/PPP2PPP/R1BQKBNR");
+        assert_eq!(game.turn, Color::White);
+        assert!(game.castle_availability().white_king);
+        assert!(game.castle_availability().white_queen);
+        assert!(game.castle_availability().black_king);
+        assert!(game.castle_availability().black_queen);
+        assert_eq!(game.en_passant, Some(Field(5,2)));
+        assert_eq!(game.halfmove_clock, 0);
+        assert_eq!(game.fullmove_clock, 5);
+    }
+
+    #[test]
+    fn load_game_from_fen_castling_partially_available() {
+        let fen_start_string = "rnbq1rk1/p3bppp/2pp1n2/4p1B1/2B1P3/2N5/PPP2PPP/R2QK1NR w KQ - 4 8";
+        let game = Game::load_game_from_fen(fen_start_string);           
+        assert_eq!(game.position().borrow().0, "rnbq1rk1/p3bppp/2pp1n2/4p1B1/2B1P3/2N5/PPP2PPP/R2QK1NR");
+        assert_eq!(game.turn, Color::White);
+        assert!(game.castle_availability().white_king);
+        assert!(game.castle_availability().white_queen);
+        assert!(!game.castle_availability().black_king);
+        assert!(!game.castle_availability().black_queen);
+        assert_eq!(game.en_passant, None);
+        assert_eq!(game.halfmove_clock, 4);
+        assert_eq!(game.fullmove_clock, 8);
+    }
 }
