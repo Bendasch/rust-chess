@@ -17,7 +17,8 @@
 # BACKLOG
 * Checkmate and stalemate
 * AI making legal moves
-* Don't panic on legal moves!
+* Don't panic on illegal moves!
+* Graceful exit
 * Save / export (FEN) positions
 * OpenGL support
 * Vulkan support
