@@ -1,5 +1,6 @@
 # DOING
-* Assertion that the inserted move is legal
+* Assertion that the move will not result in the player being in check
+* Functionality to reverse moves
 
 # TODO
 - [x] Assert that a proper piece was selected (no empty field, right color)
@@ -9,7 +10,8 @@
 - [x] Assert that player's piece is not yet on the field
 - [x] Loading FEN strings
 - [x] Test the FEN loading
-- [ ] Assert that the way to the target field is not blocked
+- [x] Assert that the way to the target field is not blocked
+- [x] Logic to discern whether a player is in check in a given position
 - [ ] Assert that the move will not result in the player being in check
 - [ ] Assert that the king doesn't move through check when castling
 - [ ] Implement en-passant and castling in the move execution
