@@ -181,7 +181,21 @@ impl PositionMatrix {
     }
 }
 
-pub struct Game {
+pub enum List {
+    Cons(State, Box<List>),
+    Nil,
+}
+
+impl List {
+    fn next(&mut self) -> Option<(State, Box<List>)> {
+        match self {
+            List::Cons(state, list) => Some((state, list)),
+            List::Nil => None
+        }
+    }
+}
+
+pub struct State {
     position: RefCell<Position>,
     position_matrix:  RefCell<PositionMatrix>,
     turn: Color,
@@ -191,14 +205,14 @@ pub struct Game {
     fullmove_clock: u16,
 }
 
-impl<'a> Game {
+impl<'a> State {
 
-    pub fn new() -> Game {
+    pub fn new() -> State {
         let fen_start_string = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
-        Game::load_game_from_fen(fen_start_string)    
+        State::load_game_from_fen(fen_start_string)    
     }
     
-    pub fn load_game_from_fen(fen_string: &str) -> Game {
+    pub fn load_game_from_fen(fen_string: &str) -> State {
         
         let game_state_vec: Vec<&str> = fen_string.split(' ').collect();
         
@@ -253,14 +267,14 @@ impl<'a> Game {
         let halfmove_clock: u16 = game_state_vec[4].parse::<u16>().unwrap();
         let fullmove_clock: u16 = game_state_vec[5].parse::<u16>().unwrap();
 
-        Game {
+        State {
             position: RefCell::new(Position(String::from(game_state_vec[0]))),
-            position_matrix: Game::init_matrix(&Position(String::from(game_state_vec[0]))),
+            position_matrix: State::init_matrix(&Position(String::from(game_state_vec[0]))),
             turn,
             castle_availability,
             en_passant,
             halfmove_clock,
-            fullmove_clock
+            fullmove_clock,
         }
     }
 
@@ -284,7 +298,7 @@ impl<'a> Game {
             for char in rank.chars() {
                 match char {
                     '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' 
-                        => Game::push_none(&mut matrix[i], char.to_digit(10).unwrap() as usize),
+                        => State::push_none(&mut matrix[i], char.to_digit(10).unwrap() as usize),
                     'r' => matrix[i].push(Piece{color: Color::Black, piecetype: PieceType::Rook}),
                     'n' => matrix[i].push(Piece{color: Color::Black, piecetype: PieceType::Knight}),
                     'b' => matrix[i].push(Piece{color: Color::Black, piecetype: PieceType::Bishop}),
@@ -311,7 +325,7 @@ impl<'a> Game {
             0 => return,
             _ => {  
                 rank.push(Piece{color: Color::None, piecetype: PieceType::None}); 
-                Game::push_none(rank, num-1)
+                State::push_none(rank, num-1)
             }
         }
     }
@@ -491,6 +505,16 @@ impl<'a> Game {
 
         // 3) Change the turn
         self.toggle_turn();
+
+        // TODO: adjust all other things:
+        // - Castling availability
+        // - En passant availability
+        // - Halfclock move number
+        // - Fullclock move number
+    }
+
+    fn revert_move(&mut self) {
+
     }
 
     fn is_piece_on_field(&self, field: &Field) -> bool {
@@ -524,7 +548,7 @@ impl<'a> Game {
             _ => panic!("No valid player color requested!")
         };
 
-        let king_field: Field = Game::get_king_field(self.position_matrix().borrow(), player).unwrap();
+        let king_field: Field = State::get_king_field(self.position_matrix().borrow(), player).unwrap();
 
         // loop over all fields
         // > when we find an enemy piece
@@ -539,7 +563,7 @@ impl<'a> Game {
                 } 
 
                 let chess_move = Move::new(&Field(i,j), &king_field, self.position_matrix().borrow());   
-                if Game::piece_can_reach_target_field(&self, &chess_move) && Game::piece_has_path_to_target_field(&self, &chess_move) { 
+                if State::piece_can_reach_target_field(&self, &chess_move) && State::piece_has_path_to_target_field(&self, &chess_move) { 
                     println!("{:?} can reach king on {:?}", piece, king_field);
                     return true;
                 }
@@ -557,7 +581,7 @@ mod tests {
     
     #[test]
     fn new_game() {
-        let game = Game::new();
+        let game = State::new();
         assert_eq!(game.position().borrow().0, "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR");
         assert_eq!(game.position_matrix().borrow().0[0][0], Piece{color: Color::White, piecetype: PieceType::Rook});
         assert_eq!(game.position_matrix().borrow().0[0][1], Piece{color: Color::White, piecetype: PieceType::Knight});
@@ -595,7 +619,7 @@ mod tests {
 
     #[test]
     fn matrix_empty_field() {
-        let game = Game::new();
+        let game = State::new();
         assert!(game.is_piece_on_field(&Field(0,0)));
         game.position_matrix().borrow_mut().empty_field(Field(0,0));
         assert!(!game.is_piece_on_field(&Field(0,0)));
@@ -603,7 +627,7 @@ mod tests {
 
     #[test]
     fn new_move() {
-        let game = Game::new();
+        let game = State::new();
         let start_field = Field(1,4);
         let target_field = Field(3,4);
         let chess_move = Move::new(&start_field, &target_field, game.position_matrix().borrow());
@@ -622,7 +646,7 @@ mod tests {
     #[test]
     fn matrix_execute_move() {
 
-        let mut game = Game::new();
+        let mut game = State::new();
         
         let start_field = Field(1,4);
         let target_field = Field(3,4);
@@ -636,7 +660,7 @@ mod tests {
     #[test]
     fn update_position_from_matrix() {
 
-        let mut game = Game::new();
+        let mut game = State::new();
         assert_eq!(game.position().borrow().0, "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR");
         
         // make a move         
@@ -659,7 +683,7 @@ mod tests {
 
     #[test]
     fn move_is_legal() {
-        let mut game = Game::new();
+        let mut game = State::new();
 
         // legal move
         let start_field = Field(0,1);
@@ -676,14 +700,14 @@ mod tests {
 
     #[test]
     fn is_players_turn() {
-        let game = Game::new();
+        let game = State::new();
         assert!(game.is_players_turn(&Color::White));
         assert!(!game.is_players_turn(&Color::Black));
     }
 
     #[test]
     fn pawn_can_reach_target_field() {       
-        let game = Game::new();
+        let game = State::new();
         
         // single up        
         let start_field = Field(1,4);
@@ -746,7 +770,7 @@ mod tests {
     
     #[test]
     fn king_can_reach_target_field() {       
-        let game = Game::new();
+        let game = State::new();
         
         // single up        
         let start_field = Field(0,4);
@@ -789,7 +813,7 @@ mod tests {
 
     #[test]
     fn knight_can_reach_target_field() {       
-        let game = Game::new();
+        let game = State::new();
         
         // two up one right        
         let start_field = Field(0,1);
@@ -848,7 +872,7 @@ mod tests {
     
     #[test]
     fn bishop_can_reach_target_field() {       
-        let game = Game::new();
+        let game = State::new();
     
         // one diagonal up
         let start_field = Field(0,2);
@@ -902,7 +926,7 @@ mod tests {
  
     #[test]
     fn rook_can_reach_target_field() {       
-        let game = Game::new();
+        let game = State::new();
         
         // one up
         let start_field = Field(0,0);
@@ -955,7 +979,7 @@ mod tests {
  
     #[test]
     fn queen_can_reach_target_field() {       
-        let game = Game::new();
+        let game = State::new();
     
         // one diagonal up
         let start_field = Field(0,3);
@@ -1029,65 +1053,65 @@ mod tests {
     #[test]
     fn pawn_has_path_to_target_field() {
         let fen_start_string = "r2qkbnr/ppp2ppp/2np4/4p3/3PP1b1/1PP2N2/P4PPP/RNBQKB1R b KQkq d3 0 5";
-        let game = Game::load_game_from_fen(fen_start_string);           
+        let game = State::load_game_from_fen(fen_start_string);           
         let start_field = Field(4,4);
         let target_field = Field(3,3);
         let chess_move = Move::new(&start_field, &target_field, game.position_matrix().borrow());
-        assert!(Game::piece_has_path_to_target_field(&game, &chess_move));
+        assert!(State::piece_has_path_to_target_field(&game, &chess_move));
     }
     
     #[test]
     fn rook_has_path_to_target_field() {
         let fen_start_string = "r2q1rk1/ppp1bppp/3p1n2/6B1/2BNP3/1P6/P4PPP/RN1K3R w - - 5 11";
-        let game = Game::load_game_from_fen(fen_start_string);           
+        let game = State::load_game_from_fen(fen_start_string);           
 
         let start_field = Field(0,7);
         let target_field = Field(0,4);
         let chess_move = Move::new(&start_field, &target_field, game.position_matrix().borrow());
-        assert!(Game::piece_has_path_to_target_field(&game, &chess_move));
+        assert!(State::piece_has_path_to_target_field(&game, &chess_move));
         
         let start_field = Field(0,0);
         let target_field = Field(4,0);
         let chess_move = Move::new(&start_field, &target_field, game.position_matrix().borrow());
-        assert!(!Game::piece_has_path_to_target_field(&game, &chess_move));
+        assert!(!State::piece_has_path_to_target_field(&game, &chess_move));
         
         let start_field = Field(0,0);
         let target_field = Field(0,4);
         let chess_move = Move::new(&start_field, &target_field, game.position_matrix().borrow());
-        assert!(!Game::piece_has_path_to_target_field(&game, &chess_move));
+        assert!(!State::piece_has_path_to_target_field(&game, &chess_move));
     }
     
     #[test]
     fn bishop_has_path_to_target_field() {  
         let fen_start_string = "r1bqkbnr/pppp1ppp/2n5/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 2 3";
-        let mut game = Game::load_game_from_fen(fen_start_string);           
+        let mut game = State::load_game_from_fen(fen_start_string);           
     
         let start_field = Field(0,5);
         let target_field = Field(4,1);
         let chess_move = Move::new(&start_field, &target_field, game.position_matrix().borrow());
-        assert!(Game::piece_has_path_to_target_field(&game, &chess_move));
+        assert!(State::piece_has_path_to_target_field(&game, &chess_move));
         
         game.execute_move(chess_move);
         let start_field = Field(7,2);
         let target_field = Field(3,6);
         let chess_move = Move::new(&start_field, &target_field, game.position_matrix().borrow());
-        assert!(!Game::piece_has_path_to_target_field(&game, &chess_move));
+        assert!(!State::piece_has_path_to_target_field(&game, &chess_move));
     }
     
     #[test]
     fn queen_has_path_to_target_field() {
         let fen_start_string = "r1b1kb1r/pp1ppppp/1q3n2/8/2BQP3/8/PPP2PPP/RNB1K2R w KQkq - 3 7";
-        let game = Game::load_game_from_fen(fen_start_string);           
+        let game = State::load_game_from_fen(fen_start_string);           
     
         let start_field = Field(3,3);
         let target_field = Field(5,1);
         let chess_move = Move::new(&start_field, &target_field, game.position_matrix().borrow());
-        assert!(Game::piece_has_path_to_target_field(&game, &chess_move));
+        assert!(State::piece_has_path_to_target_field(&game, &chess_move));
 
         let start_field = Field(3,3);
         let target_field = Field(6,0);
         let chess_move = Move::new(&start_field, &target_field, game.position_matrix().borrow());
-        assert!(!Game::piece_has_path_to_target_field(&game, &chess_move));
+        assert!(!State::piece_has_path_to_target_field(&game, &chess_move));
     }
 
 
@@ -1103,7 +1127,7 @@ mod tests {
     #[test]
     fn load_game_from_fen_new() {
         let fen_start_string = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
-        let game = Game::load_game_from_fen(fen_start_string);           
+        let game = State::load_game_from_fen(fen_start_string);           
         assert_eq!(game.position().borrow().0, "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR");
         assert_eq!(game.turn, Color::White);
         assert!(game.castle_availability().white_king);
@@ -1118,7 +1142,7 @@ mod tests {
     #[test]
     fn load_game_from_fen_sicilian_alapin() {
         let fen_start_string = "rnbqkbnr/pp1ppppp/8/2p5/4P3/2P5/PP1P1PPP/RNBQKBNR b KQkq - 0 2";
-        let game = Game::load_game_from_fen(fen_start_string);           
+        let game = State::load_game_from_fen(fen_start_string);           
         assert_eq!(game.position().borrow().0, "rnbqkbnr/pp1ppppp/8/2p5/4P3/2P5/PP1P1PPP/RNBQKBNR");
         assert_eq!(game.turn, Color::Black);
         assert!(game.castle_availability().white_king);
@@ -1133,7 +1157,7 @@ mod tests {
     #[test]
     fn load_game_from_fen_hikaru_harikrishna() {
         let fen_start_string = "r6k/1p1q3p/3r1pp1/b1R1N3/p2PQ3/P5P1/1P3P1P/3R2K1 b - - 0 28";
-        let game = Game::load_game_from_fen(fen_start_string);           
+        let game = State::load_game_from_fen(fen_start_string);           
         assert_eq!(game.position().borrow().0, "r6k/1p1q3p/3r1pp1/b1R1N3/p2PQ3/P5P1/1P3P1P/3R2K1");
         assert_eq!(game.turn, Color::Black);
         assert!(!game.castle_availability().white_king);
@@ -1148,7 +1172,7 @@ mod tests {
     #[test]
     fn load_game_from_fen_pirc_w_en_passant() {
         let fen_start_string = "rnbqkb1r/pp3ppp/3p1n2/2pPp3/4P3/2N5/PPP2PPP/R1BQKBNR w KQkq c6 0 5";
-        let game = Game::load_game_from_fen(fen_start_string);           
+        let game = State::load_game_from_fen(fen_start_string);           
         assert_eq!(game.position().borrow().0, "rnbqkb1r/pp3ppp/3p1n2/2pPp3/4P3/2N5/PPP2PPP/R1BQKBNR");
         assert_eq!(game.turn, Color::White);
         assert!(game.castle_availability().white_king);
@@ -1163,7 +1187,7 @@ mod tests {
     #[test]
     fn load_game_from_fen_castling_partially_available() {
         let fen_start_string = "rnbq1rk1/p3bppp/2pp1n2/4p1B1/2B1P3/2N5/PPP2PPP/R2QK1NR w KQ - 4 8";
-        let game = Game::load_game_from_fen(fen_start_string);           
+        let game = State::load_game_from_fen(fen_start_string);           
         assert_eq!(game.position().borrow().0, "rnbq1rk1/p3bppp/2pp1n2/4p1B1/2B1P3/2N5/PPP2PPP/R2QK1NR");
         assert_eq!(game.turn, Color::White);
         assert!(game.castle_availability().white_king);
@@ -1177,21 +1201,21 @@ mod tests {
 
     #[test]
     fn is_player_in_check_01() {
-        let game = Game::load_game_from_fen("r1b1kb1r/pp1ppppp/1q3n2/8/2BQP3/8/PPP2PPP/RNB1K2R w KQkq - 3 7");
+        let game = State::load_game_from_fen("r1b1kb1r/pp1ppppp/1q3n2/8/2BQP3/8/PPP2PPP/RNB1K2R w KQkq - 3 7");
         assert!(!game.is_player_in_check(&Color::White));
         assert!(!game.is_player_in_check(&Color::Black));
     }
 
     #[test]
     fn is_player_in_check_02() {
-        let game = Game::load_game_from_fen("r1b1kb1r/pp1Qpppp/1q3n2/8/2B1P3/8/PPP2PPP/RNB1K2R b KQkq - 0 7");
+        let game = State::load_game_from_fen("r1b1kb1r/pp1Qpppp/1q3n2/8/2B1P3/8/PPP2PPP/RNB1K2R b KQkq - 0 7");
         assert!(!game.is_player_in_check(&Color::White));
         assert!(game.is_player_in_check(&Color::Black));
     }
 
     #[test]
     fn is_player_in_check_03() {
-        let game = Game::load_game_from_fen("r3kb1r/pp1bpppp/5n2/6B1/1qB1P3/8/PPP2PPP/RN2K2R w KQkq - 2 9");
+        let game = State::load_game_from_fen("r3kb1r/pp1bpppp/5n2/6B1/1qB1P3/8/PPP2PPP/RN2K2R w KQkq - 2 9");
         assert!(game.is_player_in_check(&Color::White));
         assert!(!game.is_player_in_check(&Color::Black));
     }

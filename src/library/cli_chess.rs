@@ -1,4 +1,5 @@
 use crate::library::game::*;
+use crate::library::game::List::{Cons, Nil};
 use std::fmt;
 use std::cell::*;
 
@@ -17,12 +18,13 @@ const WHITE_PAWN: char    = '\u{2659}';
 //const EMPTY: char         = '\u{0020}';
 
 pub fn run() {
-    let mut game = Game::new();
-    draw_board(game.position());
-    draw_who_to_move(&game.turn());
+    let mut game = Cons(State::new(), Box::new(Nil));
+    let mut state = game.0.clone();
+    draw_board(state.position());
+    draw_who_to_move(&state.turn());
     loop {
-        game.next_move();
-        draw_board(game.position());
+        state.next_move();
+        draw_board(state.position());
     }
 }
 
