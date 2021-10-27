@@ -1,6 +1,5 @@
 # DOING
-* Assertion that the move will not result in the player being in check
-* Functionality to reverse moves -> switch to linked list of games!
+is_move_legal()
 
 # TODO
 - [x] Assert that a proper piece was selected (no empty field, right color)
@@ -12,7 +11,8 @@
 - [x] Test the FEN loading
 - [x] Assert that the way to the target field is not blocked
 - [x] Logic to discern whether a player is in check in a given position
-- [ ] Assert that the move will not result in the player being in check
+- [x] Basic logic to undo a move (not yet connected to UI)
+- [x] Assert that the move will not result in the player being in check
 - [ ] Assert that the king doesn't move through check when castling
 - [ ] Implement en-passant and castling in the move execution
 

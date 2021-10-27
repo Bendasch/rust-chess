@@ -3,18 +3,20 @@ use std::fmt;
 use std::cell::*;
 use std::collections::LinkedList;
 
-const BLACK_ROOK: char    = '\u{265C}';
-const BLACK_KNIGHT: char  = '\u{265E}';
-const BLACK_BISHOP: char  = '\u{265D}';
-const BLACK_QUEEN: char   = '\u{265B}';
-const BLACK_KING: char    = '\u{265A}';
-const BLACK_PAWN: char    = '\u{265F}';
-const WHITE_ROOK: char    = '\u{2656}';
-const WHITE_KNIGHT: char  = '\u{2658}';
-const WHITE_BISHOP: char  = '\u{2657}';
-const WHITE_QUEEN: char   = '\u{2655}';
-const WHITE_KING: char    = '\u{2654}';
-const WHITE_PAWN: char    = '\u{2659}';
+// somehow the black ascii chess pieces look like white and vice versa...
+// depending on the console, they made need to be swapped (again)
+const WHITE_ROOK: char    = '\u{265C}';
+const WHITE_KNIGHT: char  = '\u{265E}';
+const WHITE_BISHOP: char  = '\u{265D}';
+const WHITE_QUEEN: char   = '\u{265B}';
+const WHITE_KING: char    = '\u{265A}';
+const WHITE_PAWN: char    = '\u{265F}';
+const BLACK_ROOK: char    = '\u{2656}';
+const BLACK_KNIGHT: char  = '\u{2658}';
+const BLACK_BISHOP: char  = '\u{2657}';
+const BLACK_QUEEN: char   = '\u{2655}';
+const BLACK_KING: char    = '\u{2654}';
+const BLACK_PAWN: char    = '\u{2659}';
 //const EMPTY: char         = '\u{0020}';
 
 pub fn run() {
@@ -23,13 +25,11 @@ pub fn run() {
     loop {
         draw_board(game.back().unwrap().position().borrow());
         draw_who_to_move(game.back().unwrap().turn());
-        let next_state = game.back_mut().unwrap().next_move();
-        game.push_back(next_state);
+        State::next_move(&mut game);
     }
 }
 
 fn draw_board(position: Ref<Position>) {
-    //let position = position.borrow();
     let split: Vec<&str> = position.split();
     println!("\n   1 2 3 4 5 6 7 8");
     println!("  -----------------");

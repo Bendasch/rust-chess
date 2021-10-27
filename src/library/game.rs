@@ -4,6 +4,7 @@ use std::cmp::PartialEq;
 use std::cmp::max;
 use std::cell::RefCell;
 use std::cell::Ref;
+use std::collections::LinkedList;
 
 #[derive(PartialEq, Copy, Clone, Debug)]
 pub enum Color {
@@ -173,11 +174,11 @@ impl PositionMatrix {
         &self.0[field.0][field.1].piecetype()
     }
 
-    fn empty_field(&mut self, field: Field) {
+    fn empty_field(&mut self, field: &Field) {
         self.0[field.0][field.1] = Piece{color: Color::None, piecetype: PieceType::None};
     }
 
-    fn place_piece(&mut self, piece: Piece, field: Field) {
+    fn place_piece(&mut self, piece: Piece, field: &Field) {
         self.0[field.0][field.1] = piece;
     }
 }
@@ -322,8 +323,8 @@ impl<'a> State {
         &self.turn
     }
     
-    pub fn next_move(&self) -> State {
-       
+    pub fn next_move(game: &mut LinkedList<State>) {
+               
         // get the player input
         let mut move_string = String::new();
         io::stdin().read_line(&mut move_string).unwrap();
@@ -334,7 +335,7 @@ impl<'a> State {
         ).map(
             |c| c.to_digit(10).expect("Faulty move string") as usize
         ).collect();
-
+        
         // assert that the moves are within the bounds of the field
         assert!(1 <= move_indices[0] && move_indices[0] <= 8);
         assert!(1 <= move_indices[1] && move_indices[1] <= 8);
@@ -343,31 +344,32 @@ impl<'a> State {
         
         let start_field = Field(move_indices[0]-1, move_indices[1]-1);
         let target_field = Field(move_indices[2]-1, move_indices[3]-1);
-
+        
         // create a move instance and check whether the move is legal
         // later we might save the moves instead of the state states
-        let chess_move = Move::new(&start_field, &target_field, self.position_matrix().borrow());
-        if !self.move_is_legal(&chess_move) { panic!(
-                "Illegal move. {:?} cant move {} from {:?} to {:?}", 
-                self.turn(),
-                chess_move.piece_string(), 
-                chess_move.start_field(), 
-                chess_move.target_field()
+        let chess_move = Move::new(&start_field, &target_field, game.back_mut().unwrap().position_matrix().borrow());
+        if !game.back().unwrap().is_move_legal(&chess_move) { panic!(
+            "Illegal move. {:?} cant move {} from {:?} to {:?}", 
+            game.back_mut().unwrap().turn(),
+            chess_move.piece_string(), 
+            chess_move.start_field(), 
+            chess_move.target_field()
         );}
-
+        
         // create a new state instance 
-        let new_state: State = self.execute_move(chess_move);
+        let new_state: State = game.back_mut().unwrap().execute_move(&chess_move);
         new_state.position().borrow_mut().update_from_matrix(new_state.position_matrix().borrow());
-        new_state
+        
+        game.push_back(new_state);
     }
     
-    fn move_is_legal(&self, chess_move: &Move) -> bool {
-
+    fn is_move_legal(&self, chess_move: &Move) -> bool {
+        
         // assert that a piece was selected
         if chess_move.piece().piecetype() == &PieceType::None || chess_move.piece().color() == &Color::None {
             return false;
         }
-
+        
         // assert that the piece has the proper color
         if !self.is_players_turn(&chess_move.piece().color()) {
             return false;
@@ -391,6 +393,11 @@ impl<'a> State {
 
         // assert that the player's king is not in check after the planned move
         // this both prevents pieces moving from pins and moves during checks which don't stop those checks
+        // make a 'hypothetical move' and check whether the player would be in check
+        let hypothetical_state: State = self.execute_move(chess_move);
+        if hypothetical_state.is_player_in_check(self.turn()) {
+            return false;
+        }
         
         // in case of castling, assert that the kings does not move through check
 
@@ -484,15 +491,15 @@ impl<'a> State {
         }
     }  
 
-    fn execute_move(&self, chess_move: Move) -> State {
+    fn execute_move(&self, chess_move: &Move) -> State {
 
         let mut new_state = self.clone();
 
         // 1) remove the piece from it's current field
-        new_state.position_matrix().borrow_mut().empty_field(chess_move.start_field);
+        new_state.position_matrix().borrow_mut().empty_field(&chess_move.start_field);
     
         // 2) replace the new field with the piece
-        new_state.position_matrix().borrow_mut().place_piece(chess_move.piece, chess_move.target_field);
+        new_state.position_matrix().borrow_mut().place_piece(chess_move.piece, &chess_move.target_field);
 
         // 3) Change the turn
         new_state.toggle_turn();
@@ -506,8 +513,8 @@ impl<'a> State {
         // - Fullclock move number
     }
 
-    fn revert_move(&mut self) {
-
+    fn revert_move(game: &mut LinkedList<State>) {
+        game.pop_back();
     }
 
     fn is_piece_on_field(&self, field: &Field) -> bool {
@@ -614,7 +621,7 @@ mod tests {
     fn matrix_empty_field() {
         let state = State::new();
         assert!(state.is_piece_on_field(&Field(0,0)));
-        state.position_matrix().borrow_mut().empty_field(Field(0,0));
+        state.position_matrix().borrow_mut().empty_field(&Field(0,0));
         assert!(!state.is_piece_on_field(&Field(0,0)));
     }
 
@@ -645,7 +652,7 @@ mod tests {
         let chess_move = Move::new(&start_field, &target_field, state.position_matrix().borrow());
         let chess_move_check = Move::new(&start_field, &target_field, state.position_matrix().borrow());
 
-        let next_state = state.execute_move(chess_move);
+        let next_state = state.execute_move(&chess_move);
         
         assert_eq!(next_state.position_matrix().borrow().0[chess_move_check.start_field.0][chess_move_check.start_field.1], Piece{color: Color::None, piecetype: PieceType::None});
         assert_eq!(next_state.position_matrix().borrow().0[chess_move_check.target_field.0][chess_move_check.target_field.1], chess_move_check.piece);
@@ -661,7 +668,7 @@ mod tests {
         let start_field = Field(1,4);
         let target_field = Field(3,4);
         let chess_move = Move::new(&start_field, &target_field, state.position_matrix().borrow());
-        let mut next_state = state.execute_move(chess_move);
+        let mut next_state = state.execute_move(&chess_move);
         next_state.position().borrow_mut().update_from_matrix(next_state.position_matrix().borrow());
         assert_eq!(next_state.position().borrow().0, "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR");
         
@@ -669,27 +676,27 @@ mod tests {
         let start_field = Field(7,1);
         let target_field = Field(5,2);
         let chess_move = Move::new(&start_field, &target_field, state.position_matrix().borrow());
-        next_state = next_state.execute_move(chess_move);
+        next_state = next_state.execute_move(&chess_move);
         next_state.position().borrow_mut().update_from_matrix(next_state.position_matrix().borrow());
         assert_eq!(next_state.position().borrow().0, "r1bqkbnr/pppppppp/2n5/8/4P3/8/PPPP1PPP/RNBQKBNR");
     }
     
 
     #[test]
-    fn move_is_legal() {
+    fn is_move_legal() {
         let state = State::new();
 
         // legal move
         let start_field = Field(0,1);
         let target_field = Field(2,2);
         let legal_move = Move::new(&start_field, &target_field, state.position_matrix().borrow());
-        assert!(state.move_is_legal(&legal_move));
+        assert!(state.is_move_legal(&legal_move));
 
         // illegal move
         let start_field = Field(7,1);
         let target_field = Field(5,2);
         let illegal_move = Move::new(&start_field, &target_field, state.position_matrix().borrow());
-        assert!(!state.move_is_legal(&illegal_move));        
+        assert!(!state.is_move_legal(&illegal_move));        
     }
 
     #[test]
@@ -1085,7 +1092,7 @@ mod tests {
         let chess_move = Move::new(&start_field, &target_field, state.position_matrix().borrow());
         assert!(State::piece_has_path_to_target_field(&state, &chess_move));
         
-        let new_state = state.execute_move(chess_move);
+        let new_state = state.execute_move(&chess_move);
         let start_field = Field(7,2);
         let target_field = Field(3,6);
         let chess_move = Move::new(&start_field, &target_field, new_state.position_matrix().borrow());
@@ -1212,5 +1219,33 @@ mod tests {
         let state = State::load_game_from_fen("r3kb1r/pp1bpppp/5n2/6B1/1qB1P3/8/PPP2PPP/RN2K2R w KQkq - 2 9");
         assert!(state.is_player_in_check(&Color::White));
         assert!(!state.is_player_in_check(&Color::Black));
+    }
+
+    #[test]
+    fn is_move_legal_pin() {
+        let state = State::load_game_from_fen("r1bqkbnr/ppp2ppp/2np4/1B2p3/4P3/2N2N2/PPPP1PPP/R1BQK2R b KQkq - 1 4");
+        let chess_move = Move::new(&Field(5,2), &Field(3,3), state.position_matrix().borrow());
+        assert!(!state.is_move_legal(&chess_move));
+    }
+
+    #[test]
+    fn is_move_legal_no_pin() {
+        let state = State::load_game_from_fen("r2qkbnr/pppb1ppp/2np4/1B2p3/4P3/2N2N1P/PPPP1PP1/R1BQK2R b KQkq - 0 5");
+        let chess_move = Move::new(&Field(5,2), &Field(3,3), state.position_matrix().borrow());
+        assert!(state.is_move_legal(&chess_move));
+    }
+    
+    #[test]
+    fn is_move_legal_king_runs_into_check() {
+        let state = State::load_game_from_fen("r2qkbnr/pppb1ppp/3p4/1B2p3/3nP3/2N2N1P/PPPP1PP1/R1BQK2R w KQkq - 1 6");
+        let chess_move = Move::new(&Field(0,4), &Field(1,4), state.position_matrix().borrow());
+        assert!(!state.is_move_legal(&chess_move));
+    }
+     
+    #[test]
+    fn is_move_legal_king_does_not_run_into_check() {
+        let state = State::load_game_from_fen("r2qkbnr/pppb1ppp/2np4/1B2p3/4P3/2N2N2/PPPP1PPP/R1BQK2R w KQkq - 2 5");
+        let chess_move = Move::new(&Field(0,4), &Field(1,4), state.position_matrix().borrow());
+        assert!(state.is_move_legal(&chess_move));
     }
 }
