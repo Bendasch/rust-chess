@@ -1,7 +1,7 @@
 use crate::library::game::*;
-use crate::library::game::List::{Cons, Nil};
 use std::fmt;
 use std::cell::*;
+use std::collections::LinkedList;
 
 const BLACK_ROOK: char    = '\u{265C}';
 const BLACK_KNIGHT: char  = '\u{265E}';
@@ -18,18 +18,18 @@ const WHITE_PAWN: char    = '\u{2659}';
 //const EMPTY: char         = '\u{0020}';
 
 pub fn run() {
-    let mut game = Cons(State::new(), Box::new(Nil));
-    let Cons(state, list_box) = &game;
+    let mut game: LinkedList<State> = LinkedList::new();
+    game.push_back(State::new());
     loop {
-        draw_board(state.position());
-        draw_who_to_move(&state.turn());
-        game.next_move();
-        let Cons(state, list_box) = *list_box;
+        draw_board(game.back().unwrap().position().borrow());
+        draw_who_to_move(game.back().unwrap().turn());
+        let next_state = game.back_mut().unwrap().next_move();
+        game.push_back(next_state);
     }
 }
 
-fn draw_board(position: &RefCell<Position>) {
-    let position = position.borrow();
+fn draw_board(position: Ref<Position>) {
+    //let position = position.borrow();
     let split: Vec<&str> = position.split();
     println!("\n   1 2 3 4 5 6 7 8");
     println!("  -----------------");

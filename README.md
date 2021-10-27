@@ -1,6 +1,6 @@
 # DOING
 * Assertion that the move will not result in the player being in check
-* Functionality to reverse moves -> switch to Cons-List of Games!!
+* Functionality to reverse moves -> switch to linked list of games!
 
 # TODO
 - [x] Assert that a proper piece was selected (no empty field, right color)

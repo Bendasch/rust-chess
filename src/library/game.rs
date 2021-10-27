@@ -12,6 +12,7 @@ pub enum Color {
     None
 }
 
+#[derive(Clone, Debug)]
 pub struct CastleAvailability {
     white_king: bool,
     white_queen: bool,
@@ -105,7 +106,7 @@ pub enum PieceType {
     Pawn,
     None
 }
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Position(String);
 
 impl <'a> Position {
@@ -151,7 +152,7 @@ impl <'a> Position {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct PositionMatrix(Vec<Vec<Piece>>);
 
 impl PositionMatrix {
@@ -181,20 +182,7 @@ impl PositionMatrix {
     }
 }
 
-pub enum List {
-    Cons(State, Box<List>),
-    Nil,
-}
-
-impl List {
-    fn next(&mut self) -> Option<(State, Box<List>)> {
-        match self {
-            List::Cons(state, list) => Some((*state, *list)),
-            List::Nil => None
-        }
-    }
-}
-
+#[derive(Debug, Clone)]
 pub struct State {
     position: RefCell<Position>,
     position_matrix:  RefCell<PositionMatrix>,
@@ -334,7 +322,7 @@ impl<'a> State {
         &self.turn
     }
     
-    pub fn next_move(&mut self) {
+    pub fn next_move(&self) -> State {
        
         // get the player input
         let mut move_string = String::new();
@@ -356,7 +344,8 @@ impl<'a> State {
         let start_field = Field(move_indices[0]-1, move_indices[1]-1);
         let target_field = Field(move_indices[2]-1, move_indices[3]-1);
 
-        // execute the players move
+        // create a move instance and check whether the move is legal
+        // later we might save the moves instead of the state states
         let chess_move = Move::new(&start_field, &target_field, self.position_matrix().borrow());
         if !self.move_is_legal(&chess_move) { panic!(
                 "Illegal move. {:?} cant move {} from {:?} to {:?}", 
@@ -366,13 +355,13 @@ impl<'a> State {
                 chess_move.target_field()
         );}
 
-        self.execute_move(chess_move);
-
-        // parse position string
-        self.position().borrow_mut().update_from_matrix(self.position_matrix().borrow());
+        // create a new state instance 
+        let new_state: State = self.execute_move(chess_move);
+        new_state.position().borrow_mut().update_from_matrix(new_state.position_matrix().borrow());
+        new_state
     }
     
-    fn move_is_legal(&mut self, chess_move: &Move) -> bool {
+    fn move_is_legal(&self, chess_move: &Move) -> bool {
 
         // assert that a piece was selected
         if chess_move.piece().piecetype() == &PieceType::None || chess_move.piece().color() == &Color::None {
@@ -495,16 +484,20 @@ impl<'a> State {
         }
     }  
 
-    fn execute_move(&mut self, chess_move: Move) {
+    fn execute_move(&self, chess_move: Move) -> State {
+
+        let mut new_state = self.clone();
 
         // 1) remove the piece from it's current field
-        self.position_matrix().borrow_mut().empty_field(chess_move.start_field);
+        new_state.position_matrix().borrow_mut().empty_field(chess_move.start_field);
     
         // 2) replace the new field with the piece
-        self.position_matrix().borrow_mut().place_piece(chess_move.piece, chess_move.target_field);
+        new_state.position_matrix().borrow_mut().place_piece(chess_move.piece, chess_move.target_field);
 
         // 3) Change the turn
-        self.toggle_turn();
+        new_state.toggle_turn();
+        
+        new_state
 
         // TODO: adjust all other things:
         // - Castling availability
@@ -581,63 +574,63 @@ mod tests {
     
     #[test]
     fn new_game() {
-        let game = State::new();
-        assert_eq!(game.position().borrow().0, "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR");
-        assert_eq!(game.position_matrix().borrow().0[0][0], Piece{color: Color::White, piecetype: PieceType::Rook});
-        assert_eq!(game.position_matrix().borrow().0[0][1], Piece{color: Color::White, piecetype: PieceType::Knight});
-        assert_eq!(game.position_matrix().borrow().0[0][2], Piece{color: Color::White, piecetype: PieceType::Bishop});
-        assert_eq!(game.position_matrix().borrow().0[0][3], Piece{color: Color::White, piecetype: PieceType::Queen});
-        assert_eq!(game.position_matrix().borrow().0[0][4], Piece{color: Color::White, piecetype: PieceType::King});
-        assert_eq!(game.position_matrix().borrow().0[0][5], Piece{color: Color::White, piecetype: PieceType::Bishop});
-        assert_eq!(game.position_matrix().borrow().0[0][6], Piece{color: Color::White, piecetype: PieceType::Knight});
-        assert_eq!(game.position_matrix().borrow().0[0][7], Piece{color: Color::White, piecetype: PieceType::Rook});
-        assert_eq!(game.position_matrix().borrow().0[1][0], Piece{color: Color::White, piecetype: PieceType::Pawn});
-        assert_eq!(game.position_matrix().borrow().0[1][1], Piece{color: Color::White, piecetype: PieceType::Pawn});
-        assert_eq!(game.position_matrix().borrow().0[1][2], Piece{color: Color::White, piecetype: PieceType::Pawn});
-        assert_eq!(game.position_matrix().borrow().0[1][3], Piece{color: Color::White, piecetype: PieceType::Pawn});
-        assert_eq!(game.position_matrix().borrow().0[1][4], Piece{color: Color::White, piecetype: PieceType::Pawn});
-        assert_eq!(game.position_matrix().borrow().0[1][5], Piece{color: Color::White, piecetype: PieceType::Pawn});
-        assert_eq!(game.position_matrix().borrow().0[1][6], Piece{color: Color::White, piecetype: PieceType::Pawn});
-        assert_eq!(game.position_matrix().borrow().0[1][7], Piece{color: Color::White, piecetype: PieceType::Pawn});        
-        assert_eq!(game.position_matrix().borrow().0[6][0], Piece{color: Color::Black, piecetype: PieceType::Pawn});
-        assert_eq!(game.position_matrix().borrow().0[6][1], Piece{color: Color::Black, piecetype: PieceType::Pawn});
-        assert_eq!(game.position_matrix().borrow().0[6][2], Piece{color: Color::Black, piecetype: PieceType::Pawn});
-        assert_eq!(game.position_matrix().borrow().0[6][3], Piece{color: Color::Black, piecetype: PieceType::Pawn});
-        assert_eq!(game.position_matrix().borrow().0[6][4], Piece{color: Color::Black, piecetype: PieceType::Pawn});
-        assert_eq!(game.position_matrix().borrow().0[6][5], Piece{color: Color::Black, piecetype: PieceType::Pawn});
-        assert_eq!(game.position_matrix().borrow().0[6][6], Piece{color: Color::Black, piecetype: PieceType::Pawn});
-        assert_eq!(game.position_matrix().borrow().0[6][7], Piece{color: Color::Black, piecetype: PieceType::Pawn});        
-        assert_eq!(game.position_matrix().borrow().0[7][0], Piece{color: Color::Black, piecetype: PieceType::Rook});
-        assert_eq!(game.position_matrix().borrow().0[7][1], Piece{color: Color::Black, piecetype: PieceType::Knight});
-        assert_eq!(game.position_matrix().borrow().0[7][2], Piece{color: Color::Black, piecetype: PieceType::Bishop});
-        assert_eq!(game.position_matrix().borrow().0[7][3], Piece{color: Color::Black, piecetype: PieceType::Queen});
-        assert_eq!(game.position_matrix().borrow().0[7][4], Piece{color: Color::Black, piecetype: PieceType::King});
-        assert_eq!(game.position_matrix().borrow().0[7][5], Piece{color: Color::Black, piecetype: PieceType::Bishop});
-        assert_eq!(game.position_matrix().borrow().0[7][6], Piece{color: Color::Black, piecetype: PieceType::Knight});
-        assert_eq!(game.position_matrix().borrow().0[7][7], Piece{color: Color::Black, piecetype: PieceType::Rook});
+        let state = State::new();
+        assert_eq!(state.position().borrow().0, "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR");
+        assert_eq!(state.position_matrix().borrow().0[0][0], Piece{color: Color::White, piecetype: PieceType::Rook});
+        assert_eq!(state.position_matrix().borrow().0[0][1], Piece{color: Color::White, piecetype: PieceType::Knight});
+        assert_eq!(state.position_matrix().borrow().0[0][2], Piece{color: Color::White, piecetype: PieceType::Bishop});
+        assert_eq!(state.position_matrix().borrow().0[0][3], Piece{color: Color::White, piecetype: PieceType::Queen});
+        assert_eq!(state.position_matrix().borrow().0[0][4], Piece{color: Color::White, piecetype: PieceType::King});
+        assert_eq!(state.position_matrix().borrow().0[0][5], Piece{color: Color::White, piecetype: PieceType::Bishop});
+        assert_eq!(state.position_matrix().borrow().0[0][6], Piece{color: Color::White, piecetype: PieceType::Knight});
+        assert_eq!(state.position_matrix().borrow().0[0][7], Piece{color: Color::White, piecetype: PieceType::Rook});
+        assert_eq!(state.position_matrix().borrow().0[1][0], Piece{color: Color::White, piecetype: PieceType::Pawn});
+        assert_eq!(state.position_matrix().borrow().0[1][1], Piece{color: Color::White, piecetype: PieceType::Pawn});
+        assert_eq!(state.position_matrix().borrow().0[1][2], Piece{color: Color::White, piecetype: PieceType::Pawn});
+        assert_eq!(state.position_matrix().borrow().0[1][3], Piece{color: Color::White, piecetype: PieceType::Pawn});
+        assert_eq!(state.position_matrix().borrow().0[1][4], Piece{color: Color::White, piecetype: PieceType::Pawn});
+        assert_eq!(state.position_matrix().borrow().0[1][5], Piece{color: Color::White, piecetype: PieceType::Pawn});
+        assert_eq!(state.position_matrix().borrow().0[1][6], Piece{color: Color::White, piecetype: PieceType::Pawn});
+        assert_eq!(state.position_matrix().borrow().0[1][7], Piece{color: Color::White, piecetype: PieceType::Pawn});        
+        assert_eq!(state.position_matrix().borrow().0[6][0], Piece{color: Color::Black, piecetype: PieceType::Pawn});
+        assert_eq!(state.position_matrix().borrow().0[6][1], Piece{color: Color::Black, piecetype: PieceType::Pawn});
+        assert_eq!(state.position_matrix().borrow().0[6][2], Piece{color: Color::Black, piecetype: PieceType::Pawn});
+        assert_eq!(state.position_matrix().borrow().0[6][3], Piece{color: Color::Black, piecetype: PieceType::Pawn});
+        assert_eq!(state.position_matrix().borrow().0[6][4], Piece{color: Color::Black, piecetype: PieceType::Pawn});
+        assert_eq!(state.position_matrix().borrow().0[6][5], Piece{color: Color::Black, piecetype: PieceType::Pawn});
+        assert_eq!(state.position_matrix().borrow().0[6][6], Piece{color: Color::Black, piecetype: PieceType::Pawn});
+        assert_eq!(state.position_matrix().borrow().0[6][7], Piece{color: Color::Black, piecetype: PieceType::Pawn});        
+        assert_eq!(state.position_matrix().borrow().0[7][0], Piece{color: Color::Black, piecetype: PieceType::Rook});
+        assert_eq!(state.position_matrix().borrow().0[7][1], Piece{color: Color::Black, piecetype: PieceType::Knight});
+        assert_eq!(state.position_matrix().borrow().0[7][2], Piece{color: Color::Black, piecetype: PieceType::Bishop});
+        assert_eq!(state.position_matrix().borrow().0[7][3], Piece{color: Color::Black, piecetype: PieceType::Queen});
+        assert_eq!(state.position_matrix().borrow().0[7][4], Piece{color: Color::Black, piecetype: PieceType::King});
+        assert_eq!(state.position_matrix().borrow().0[7][5], Piece{color: Color::Black, piecetype: PieceType::Bishop});
+        assert_eq!(state.position_matrix().borrow().0[7][6], Piece{color: Color::Black, piecetype: PieceType::Knight});
+        assert_eq!(state.position_matrix().borrow().0[7][7], Piece{color: Color::Black, piecetype: PieceType::Rook});
     }
 
     #[test]
     fn matrix_empty_field() {
-        let game = State::new();
-        assert!(game.is_piece_on_field(&Field(0,0)));
-        game.position_matrix().borrow_mut().empty_field(Field(0,0));
-        assert!(!game.is_piece_on_field(&Field(0,0)));
+        let state = State::new();
+        assert!(state.is_piece_on_field(&Field(0,0)));
+        state.position_matrix().borrow_mut().empty_field(Field(0,0));
+        assert!(!state.is_piece_on_field(&Field(0,0)));
     }
 
     #[test]
     fn new_move() {
-        let game = State::new();
+        let state = State::new();
         let start_field = Field(1,4);
         let target_field = Field(3,4);
-        let chess_move = Move::new(&start_field, &target_field, game.position_matrix().borrow());
+        let chess_move = Move::new(&start_field, &target_field, state.position_matrix().borrow());
         assert_eq!(chess_move.piece, Piece{color: Color::White, piecetype: PieceType::Pawn});
         assert_eq!(chess_move.start_field, Field(1,4));
         assert_eq!(chess_move.target_field, Field(3,4));
         
         let start_field = Field(6,2);
         let target_field = Field(5,2);
-        let chess_move = Move::new(&start_field, &target_field, game.position_matrix().borrow());
+        let chess_move = Move::new(&start_field, &target_field, state.position_matrix().borrow());
         assert_eq!(chess_move.piece, Piece{color: Color::Black, piecetype: PieceType::Pawn});
         assert_eq!(chess_move.start_field, Field(6,2));
         assert_eq!(chess_move.target_field, Field(5,2));
@@ -645,123 +638,124 @@ mod tests {
 
     #[test]
     fn matrix_execute_move() {
-
-        let mut game = State::new();
+        let state = State::new();
         
         let start_field = Field(1,4);
         let target_field = Field(3,4);
-        let chess_move = Move::new(&start_field, &target_field, game.position_matrix().borrow());
-        let chess_move_check = Move::new(&start_field, &target_field, game.position_matrix().borrow());
+        let chess_move = Move::new(&start_field, &target_field, state.position_matrix().borrow());
+        let chess_move_check = Move::new(&start_field, &target_field, state.position_matrix().borrow());
 
-        game.execute_move(chess_move);
-        assert_eq!(game.position_matrix().borrow().0[chess_move_check.target_field.0][chess_move_check.target_field.1], chess_move_check.piece);
+        let next_state = state.execute_move(chess_move);
+        
+        assert_eq!(next_state.position_matrix().borrow().0[chess_move_check.start_field.0][chess_move_check.start_field.1], Piece{color: Color::None, piecetype: PieceType::None});
+        assert_eq!(next_state.position_matrix().borrow().0[chess_move_check.target_field.0][chess_move_check.target_field.1], chess_move_check.piece);
     }
 
     #[test]
     fn update_position_from_matrix() {
 
-        let mut game = State::new();
-        assert_eq!(game.position().borrow().0, "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR");
+        let state = State::new();
+        assert_eq!(state.position().borrow().0, "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR");
         
         // make a move         
         let start_field = Field(1,4);
         let target_field = Field(3,4);
-        let chess_move = Move::new(&start_field, &target_field, game.position_matrix().borrow());
-        game.execute_move(chess_move);
-        game.position().borrow_mut().update_from_matrix(game.position_matrix().borrow());
-        assert_eq!(game.position().borrow().0, "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR");
+        let chess_move = Move::new(&start_field, &target_field, state.position_matrix().borrow());
+        let mut next_state = state.execute_move(chess_move);
+        next_state.position().borrow_mut().update_from_matrix(next_state.position_matrix().borrow());
+        assert_eq!(next_state.position().borrow().0, "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR");
         
         // make another move        
         let start_field = Field(7,1);
         let target_field = Field(5,2);
-        let chess_move = Move::new(&start_field, &target_field, game.position_matrix().borrow());
-        game.execute_move(chess_move);
-        game.position().borrow_mut().update_from_matrix(game.position_matrix().borrow());
-        assert_eq!(game.position().borrow().0, "r1bqkbnr/pppppppp/2n5/8/4P3/8/PPPP1PPP/RNBQKBNR");
+        let chess_move = Move::new(&start_field, &target_field, state.position_matrix().borrow());
+        next_state = next_state.execute_move(chess_move);
+        next_state.position().borrow_mut().update_from_matrix(next_state.position_matrix().borrow());
+        assert_eq!(next_state.position().borrow().0, "r1bqkbnr/pppppppp/2n5/8/4P3/8/PPPP1PPP/RNBQKBNR");
     }
     
 
     #[test]
     fn move_is_legal() {
-        let mut game = State::new();
+        let state = State::new();
 
         // legal move
         let start_field = Field(0,1);
         let target_field = Field(2,2);
-        let legal_move = Move::new(&start_field, &target_field, game.position_matrix().borrow());
-        assert!(game.move_is_legal(&legal_move));
+        let legal_move = Move::new(&start_field, &target_field, state.position_matrix().borrow());
+        assert!(state.move_is_legal(&legal_move));
 
         // illegal move
         let start_field = Field(7,1);
         let target_field = Field(5,2);
-        let illegal_move = Move::new(&start_field, &target_field, game.position_matrix().borrow());
-        assert!(!game.move_is_legal(&illegal_move));        
+        let illegal_move = Move::new(&start_field, &target_field, state.position_matrix().borrow());
+        assert!(!state.move_is_legal(&illegal_move));        
     }
 
     #[test]
     fn is_players_turn() {
-        let game = State::new();
-        assert!(game.is_players_turn(&Color::White));
-        assert!(!game.is_players_turn(&Color::Black));
+        let state = State::new();
+        assert!(state.is_players_turn(&Color::White));
+        assert!(!state.is_players_turn(&Color::Black));
     }
 
     #[test]
     fn pawn_can_reach_target_field() {       
-        let game = State::new();
+        let state = State::new();
         
         // single up        
         let start_field = Field(1,4);
         let target_field = Field(2,4);
-        let chess_move = Move::new(&start_field, &target_field, game.position_matrix().borrow());
-        assert!(game.piece_can_reach_target_field(&chess_move));
+        let chess_move = Move::new(&start_field, &target_field, state.position_matrix().borrow());
+        assert!(state.piece_can_reach_target_field(&chess_move));
     
         // double up
         let start_field = Field(1,4);
         let target_field = Field(3,4);
-        let chess_move = Move::new(&start_field, &target_field, game.position_matrix().borrow());
-        assert!(game.piece_can_reach_target_field(&chess_move));
+        let chess_move = Move::new(&start_field, &target_field, state.position_matrix().borrow());
+        assert!(state.piece_can_reach_target_field(&chess_move));
 
         // single down
         let start_field = Field(6,4);
         let target_field = Field(5,4);
-        let chess_move = Move::new(&start_field, &target_field, game.position_matrix().borrow());
-        assert!(game.piece_can_reach_target_field(&chess_move));
+        let chess_move = Move::new(&start_field, &target_field, state.position_matrix().borrow());
+        assert!(state.piece_can_reach_target_field(&chess_move));
         
         // double down
         let start_field = Field(6,4);
         let target_field = Field(4,4);
-        let chess_move = Move::new(&start_field, &target_field, game.position_matrix().borrow());
-        assert!(game.piece_can_reach_target_field(&chess_move));
+        let chess_move = Move::new(&start_field, &target_field, state.position_matrix().borrow());
+        assert!(state.piece_can_reach_target_field(&chess_move));
         
         // single diagonal down (should return false since no enemy piece is there)
         let start_field = Field(6,4);
         let target_field = Field(5,3);
-        let chess_move = Move::new(&start_field, &target_field, game.position_matrix().borrow());
-        assert!(!game.piece_can_reach_target_field(&chess_move));
+        let chess_move = Move::new(&start_field, &target_field, state.position_matrix().borrow());
+        assert!(!state.piece_can_reach_target_field(&chess_move));
         
         // single diagonal up (should return false since no enemy piece is there)
         let start_field = Field(1,4);
         let target_field = Field(2,3);
-        let chess_move = Move::new(&start_field, &target_field, game.position_matrix().borrow());
-        assert!(!game.piece_can_reach_target_field(&chess_move));
+        let chess_move = Move::new(&start_field, &target_field, state.position_matrix().borrow());
+        assert!(!state.piece_can_reach_target_field(&chess_move));
         
         // three up (should return false!)
         let start_field = Field(1,5);
         let target_field = Field(4,5);
-        let chess_move = Move::new(&start_field, &target_field, game.position_matrix().borrow());
-        assert!(!game.piece_can_reach_target_field(&chess_move));
+        let chess_move = Move::new(&start_field, &target_field, state.position_matrix().borrow());
+        assert!(!state.piece_can_reach_target_field(&chess_move));
         
         // two up one to the side (should return false!)
         let start_field = Field(1,0);
         let target_field = Field(3,1);
-        let chess_move = Move::new(&start_field, &target_field, game.position_matrix().borrow());
-        assert!(!game.piece_can_reach_target_field(&chess_move));
+        let chess_move = Move::new(&start_field, &target_field, state.position_matrix().borrow());
+        assert!(!state.piece_can_reach_target_field(&chess_move));
         
         // one down two to the side (should return false!)
         let start_field = Field(6,6);
         let target_field = Field(5,4);
-        let chess_move = Move::new(&start_field, &target_field, game.position_matrix().borrow());
-        assert!(!game.piece_can_reach_target_field(&chess_move));
+        let chess_move = Move::new(&start_field, &target_field, state.position_matrix().borrow());
+        assert!(!state.piece_can_reach_target_field(&chess_move));
         
         // TODO: Check diagonal when enemy piece is there
         // TODO: Check en-passant when available
@@ -770,282 +764,282 @@ mod tests {
     
     #[test]
     fn king_can_reach_target_field() {       
-        let game = State::new();
+        let state = State::new();
         
         // single up        
         let start_field = Field(0,4);
         let target_field = Field(1,4);
-        let chess_move = Move::new(&start_field, &target_field, game.position_matrix().borrow());
-        assert!(game.piece_can_reach_target_field(&chess_move));
+        let chess_move = Move::new(&start_field, &target_field, state.position_matrix().borrow());
+        assert!(state.piece_can_reach_target_field(&chess_move));
     
         // single right        
         let start_field = Field(0,4);
         let target_field = Field(0,5);
-        let chess_move = Move::new(&start_field, &target_field, game.position_matrix().borrow());
-        assert!(game.piece_can_reach_target_field(&chess_move));
+        let chess_move = Move::new(&start_field, &target_field, state.position_matrix().borrow());
+        assert!(state.piece_can_reach_target_field(&chess_move));
     
         // double up        
         let start_field = Field(0,4);
         let target_field = Field(2,4);
-        let chess_move = Move::new(&start_field, &target_field, game.position_matrix().borrow());
-        assert!(!game.piece_can_reach_target_field(&chess_move));
+        let chess_move = Move::new(&start_field, &target_field, state.position_matrix().borrow());
+        assert!(!state.piece_can_reach_target_field(&chess_move));
     
         // double diagonal        
         let start_field = Field(0,4);
         let target_field = Field(2,2);
-        let chess_move = Move::new(&start_field, &target_field, game.position_matrix().borrow());
-        assert!(!game.piece_can_reach_target_field(&chess_move));
+        let chess_move = Move::new(&start_field, &target_field, state.position_matrix().borrow());
+        assert!(!state.piece_can_reach_target_field(&chess_move));
 
         // castle queen-side        
         let start_field = Field(0,4);
         let target_field = Field(0,0);
-        let chess_move = Move::new(&start_field, &target_field, game.position_matrix().borrow());
-        assert!(game.piece_can_reach_target_field(&chess_move));
+        let chess_move = Move::new(&start_field, &target_field, state.position_matrix().borrow());
+        assert!(state.piece_can_reach_target_field(&chess_move));
     
         // castle king-side        
         let start_field = Field(0,4);
         let target_field = Field(0,7);
-        let chess_move = Move::new(&start_field, &target_field, game.position_matrix().borrow());
-        assert!(game.piece_can_reach_target_field(&chess_move));    
+        let chess_move = Move::new(&start_field, &target_field, state.position_matrix().borrow());
+        assert!(state.piece_can_reach_target_field(&chess_move));    
     
         // TODO: assert castling is NOT allowed e.g. when king moved
     }
 
     #[test]
     fn knight_can_reach_target_field() {       
-        let game = State::new();
+        let state = State::new();
         
         // two up one right        
         let start_field = Field(0,1);
         let target_field = Field(2,2);
-        let chess_move = Move::new(&start_field, &target_field, game.position_matrix().borrow());
-        assert!(game.piece_can_reach_target_field(&chess_move));
+        let chess_move = Move::new(&start_field, &target_field, state.position_matrix().borrow());
+        assert!(state.piece_can_reach_target_field(&chess_move));
         
         // two up one left
         let start_field = Field(0,1);
         let target_field = Field(2,0);
-        let chess_move = Move::new(&start_field, &target_field, game.position_matrix().borrow());
-        assert!(game.piece_can_reach_target_field(&chess_move));
+        let chess_move = Move::new(&start_field, &target_field, state.position_matrix().borrow());
+        assert!(state.piece_can_reach_target_field(&chess_move));
         
         // two right one down
         let start_field = Field(7,1);
         let target_field = Field(6,3);
-        let chess_move = Move::new(&start_field, &target_field, game.position_matrix().borrow());
-        assert!(game.piece_can_reach_target_field(&chess_move));
+        let chess_move = Move::new(&start_field, &target_field, state.position_matrix().borrow());
+        assert!(state.piece_can_reach_target_field(&chess_move));
         
         // two right one up
         let start_field = Field(0,1);
         let target_field = Field(1,3);
-        let chess_move = Move::new(&start_field, &target_field, game.position_matrix().borrow());
-        assert!(game.piece_can_reach_target_field(&chess_move));       
+        let chess_move = Move::new(&start_field, &target_field, state.position_matrix().borrow());
+        assert!(state.piece_can_reach_target_field(&chess_move));       
         
         // single diagonal up (should return false)
         let start_field = Field(0,1);
         let target_field = Field(1,0);
-        let chess_move = Move::new(&start_field, &target_field, game.position_matrix().borrow());
-        assert!(!game.piece_can_reach_target_field(&chess_move));
+        let chess_move = Move::new(&start_field, &target_field, state.position_matrix().borrow());
+        assert!(!state.piece_can_reach_target_field(&chess_move));
         
         // single diagonal down (should return false)
         let start_field = Field(7,6);
         let target_field = Field(6,5);
-        let chess_move = Move::new(&start_field, &target_field, game.position_matrix().borrow());
-        assert!(!game.piece_can_reach_target_field(&chess_move));
+        let chess_move = Move::new(&start_field, &target_field, state.position_matrix().borrow());
+        assert!(!state.piece_can_reach_target_field(&chess_move));
         
         // double up (should return false)
         let start_field = Field(0,1);
         let target_field = Field(2,1);
-        let chess_move = Move::new(&start_field, &target_field, game.position_matrix().borrow());
-        assert!(!game.piece_can_reach_target_field(&chess_move));
+        let chess_move = Move::new(&start_field, &target_field, state.position_matrix().borrow());
+        assert!(!state.piece_can_reach_target_field(&chess_move));
         
         // double to side (should return false)
         let start_field = Field(0,6);
         let target_field = Field(0,4);
-        let chess_move = Move::new(&start_field, &target_field, game.position_matrix().borrow());
-        assert!(!game.piece_can_reach_target_field(&chess_move));
+        let chess_move = Move::new(&start_field, &target_field, state.position_matrix().borrow());
+        assert!(!state.piece_can_reach_target_field(&chess_move));
 
         // single up (should return false)
         let start_field = Field(0,6);
         let target_field = Field(1,6);
-        let chess_move = Move::new(&start_field, &target_field, game.position_matrix().borrow());
-        assert!(!game.piece_can_reach_target_field(&chess_move));
+        let chess_move = Move::new(&start_field, &target_field, state.position_matrix().borrow());
+        assert!(!state.piece_can_reach_target_field(&chess_move));
     } 
     
     #[test]
     fn bishop_can_reach_target_field() {       
-        let game = State::new();
+        let state = State::new();
     
         // one diagonal up
         let start_field = Field(0,2);
         let target_field = Field(1,1);
-        let chess_move = Move::new(&start_field, &target_field, game.position_matrix().borrow());
-        assert!(game.piece_can_reach_target_field(&chess_move));
+        let chess_move = Move::new(&start_field, &target_field, state.position_matrix().borrow());
+        assert!(state.piece_can_reach_target_field(&chess_move));
 
         // one diagonal down
         let start_field = Field(7,2);
         let target_field = Field(6,3);
-        let chess_move = Move::new(&start_field, &target_field, game.position_matrix().borrow());
-        assert!(game.piece_can_reach_target_field(&chess_move));
+        let chess_move = Move::new(&start_field, &target_field, state.position_matrix().borrow());
+        assert!(state.piece_can_reach_target_field(&chess_move));
         
         // three diagonal up
         let start_field = Field(0,2);
         let target_field = Field(3,5);
-        let chess_move = Move::new(&start_field, &target_field, game.position_matrix().borrow());
-        assert!(game.piece_can_reach_target_field(&chess_move));
+        let chess_move = Move::new(&start_field, &target_field, state.position_matrix().borrow());
+        assert!(state.piece_can_reach_target_field(&chess_move));
         
         // five diagonal down
         let start_field = Field(7,5);
         let target_field = Field(2,0);
-        let chess_move = Move::new(&start_field, &target_field, game.position_matrix().borrow());
-        assert!(game.piece_can_reach_target_field(&chess_move));
+        let chess_move = Move::new(&start_field, &target_field, state.position_matrix().borrow());
+        assert!(state.piece_can_reach_target_field(&chess_move));
 
         // one to the side (should return false)
         let start_field = Field(0,2);
         let target_field = Field(0,3);
-        let chess_move = Move::new(&start_field, &target_field, game.position_matrix().borrow());
-        assert!(!game.piece_can_reach_target_field(&chess_move));
+        let chess_move = Move::new(&start_field, &target_field, state.position_matrix().borrow());
+        assert!(!state.piece_can_reach_target_field(&chess_move));
 
         // one up (should return false)
         let start_field = Field(0,2);
         let target_field = Field(1,2);
-        let chess_move = Move::new(&start_field, &target_field, game.position_matrix().borrow());
-        assert!(!game.piece_can_reach_target_field(&chess_move));
+        let chess_move = Move::new(&start_field, &target_field, state.position_matrix().borrow());
+        assert!(!state.piece_can_reach_target_field(&chess_move));
         
         // one down (should return false)
         let start_field = Field(7,2);
         let target_field = Field(6,2);
-        let chess_move = Move::new(&start_field, &target_field, game.position_matrix().borrow());
-        assert!(!game.piece_can_reach_target_field(&chess_move));
+        let chess_move = Move::new(&start_field, &target_field, state.position_matrix().borrow());
+        assert!(!state.piece_can_reach_target_field(&chess_move));
 
         // two down, one to the side (should return false)
         let start_field = Field(7,2);
         let target_field = Field(5,2);
-        let chess_move = Move::new(&start_field, &target_field, game.position_matrix().borrow());
-        assert!(!game.piece_can_reach_target_field(&chess_move));
+        let chess_move = Move::new(&start_field, &target_field, state.position_matrix().borrow());
+        assert!(!state.piece_can_reach_target_field(&chess_move));
     }
 
  
     #[test]
     fn rook_can_reach_target_field() {       
-        let game = State::new();
+        let state = State::new();
         
         // one up
         let start_field = Field(0,0);
         let target_field = Field(1,0);
-        let chess_move = Move::new(&start_field, &target_field, game.position_matrix().borrow());
-        assert!(game.piece_can_reach_target_field(&chess_move));
+        let chess_move = Move::new(&start_field, &target_field, state.position_matrix().borrow());
+        assert!(state.piece_can_reach_target_field(&chess_move));
         
         // four up
         let start_field = Field(0,0);
         let target_field = Field(4,0);
-        let chess_move = Move::new(&start_field, &target_field, game.position_matrix().borrow());
-        assert!(game.piece_can_reach_target_field(&chess_move));
+        let chess_move = Move::new(&start_field, &target_field, state.position_matrix().borrow());
+        assert!(state.piece_can_reach_target_field(&chess_move));
         
         // seven down
         let start_field = Field(7,0);
         let target_field = Field(0,0);
-        let chess_move = Move::new(&start_field, &target_field, game.position_matrix().borrow());
-        assert!(game.piece_can_reach_target_field(&chess_move));
+        let chess_move = Move::new(&start_field, &target_field, state.position_matrix().borrow());
+        assert!(state.piece_can_reach_target_field(&chess_move));
         
         // one to the side
         let start_field = Field(7,0);
         let target_field = Field(7,1);
-        let chess_move = Move::new(&start_field, &target_field, game.position_matrix().borrow());
-        assert!(game.piece_can_reach_target_field(&chess_move));
+        let chess_move = Move::new(&start_field, &target_field, state.position_matrix().borrow());
+        assert!(state.piece_can_reach_target_field(&chess_move));
         
         // five to the side 
         let start_field = Field(7,7);
         let target_field = Field(7,2);
-        let chess_move = Move::new(&start_field, &target_field, game.position_matrix().borrow());
-        assert!(game.piece_can_reach_target_field(&chess_move));
+        let chess_move = Move::new(&start_field, &target_field, state.position_matrix().borrow());
+        assert!(state.piece_can_reach_target_field(&chess_move));
         
         // one diagonal (should return false)
         let start_field = Field(0,0);
         let target_field = Field(1,1);
-        let chess_move = Move::new(&start_field, &target_field, game.position_matrix().borrow());
-        assert!(!game.piece_can_reach_target_field(&chess_move));
+        let chess_move = Move::new(&start_field, &target_field, state.position_matrix().borrow());
+        assert!(!state.piece_can_reach_target_field(&chess_move));
         
         // three diagonal (should return false)
         let start_field = Field(7,7);
         let target_field = Field(4,4);
-        let chess_move = Move::new(&start_field, &target_field, game.position_matrix().borrow());
-        assert!(!game.piece_can_reach_target_field(&chess_move));
+        let chess_move = Move::new(&start_field, &target_field, state.position_matrix().borrow());
+        assert!(!state.piece_can_reach_target_field(&chess_move));
         
         // four to the side three down (should return false)
         let start_field = Field(7,7);
         let target_field = Field(4,3);
-        let chess_move = Move::new(&start_field, &target_field, game.position_matrix().borrow());
-        assert!(!game.piece_can_reach_target_field(&chess_move));
+        let chess_move = Move::new(&start_field, &target_field, state.position_matrix().borrow());
+        assert!(!state.piece_can_reach_target_field(&chess_move));
     }
  
     #[test]
     fn queen_can_reach_target_field() {       
-        let game = State::new();
+        let state = State::new();
     
         // one diagonal up
         let start_field = Field(0,3);
         let target_field = Field(1,2);
-        let chess_move = Move::new(&start_field, &target_field, game.position_matrix().borrow());
-        assert!(game.piece_can_reach_target_field(&chess_move));
+        let chess_move = Move::new(&start_field, &target_field, state.position_matrix().borrow());
+        assert!(state.piece_can_reach_target_field(&chess_move));
 
         // one diagonal down
         let start_field = Field(7,3);
         let target_field = Field(6,4);
-        let chess_move = Move::new(&start_field, &target_field, game.position_matrix().borrow());
-        assert!(game.piece_can_reach_target_field(&chess_move));
+        let chess_move = Move::new(&start_field, &target_field, state.position_matrix().borrow());
+        assert!(state.piece_can_reach_target_field(&chess_move));
         
         // three diagonal up
         let start_field = Field(0,3);
         let target_field = Field(3,6);
-        let chess_move = Move::new(&start_field, &target_field, game.position_matrix().borrow());
-        assert!(game.piece_can_reach_target_field(&chess_move));
+        let chess_move = Move::new(&start_field, &target_field, state.position_matrix().borrow());
+        assert!(state.piece_can_reach_target_field(&chess_move));
         
         // four diagonal down
         let start_field = Field(7,3);
         let target_field = Field(3,7);
-        let chess_move = Move::new(&start_field, &target_field, game.position_matrix().borrow());
-        assert!(game.piece_can_reach_target_field(&chess_move));
+        let chess_move = Move::new(&start_field, &target_field, state.position_matrix().borrow());
+        assert!(state.piece_can_reach_target_field(&chess_move));
 
         // one up
         let start_field = Field(0,3);
         let target_field = Field(1,3);
-        let chess_move = Move::new(&start_field, &target_field, game.position_matrix().borrow());
-        assert!(game.piece_can_reach_target_field(&chess_move));
+        let chess_move = Move::new(&start_field, &target_field, state.position_matrix().borrow());
+        assert!(state.piece_can_reach_target_field(&chess_move));
         
         // four up
         let start_field = Field(0,3);
         let target_field = Field(4,3);
-        let chess_move = Move::new(&start_field, &target_field, game.position_matrix().borrow());
-        assert!(game.piece_can_reach_target_field(&chess_move));
+        let chess_move = Move::new(&start_field, &target_field, state.position_matrix().borrow());
+        assert!(state.piece_can_reach_target_field(&chess_move));
         
         // seven down
         let start_field = Field(7,3);
         let target_field = Field(0,3);
-        let chess_move = Move::new(&start_field, &target_field, game.position_matrix().borrow());
-        assert!(game.piece_can_reach_target_field(&chess_move));
+        let chess_move = Move::new(&start_field, &target_field, state.position_matrix().borrow());
+        assert!(state.piece_can_reach_target_field(&chess_move));
         
         // one to the side
         let start_field = Field(7,3);
         let target_field = Field(7,2);
-        let chess_move = Move::new(&start_field, &target_field, game.position_matrix().borrow());
-        assert!(game.piece_can_reach_target_field(&chess_move));
+        let chess_move = Move::new(&start_field, &target_field, state.position_matrix().borrow());
+        assert!(state.piece_can_reach_target_field(&chess_move));
         
         // three to the side 
         let start_field = Field(0,3);
         let target_field = Field(0,0);
-        let chess_move = Move::new(&start_field, &target_field, game.position_matrix().borrow());
-        assert!(game.piece_can_reach_target_field(&chess_move));
+        let chess_move = Move::new(&start_field, &target_field, state.position_matrix().borrow());
+        assert!(state.piece_can_reach_target_field(&chess_move));
         
         // two down, one to the side (should return false)
         let start_field = Field(7,3);
         let target_field = Field(5,4);
-        let chess_move = Move::new(&start_field, &target_field, game.position_matrix().borrow());
-        assert!(!game.piece_can_reach_target_field(&chess_move));
+        let chess_move = Move::new(&start_field, &target_field, state.position_matrix().borrow());
+        assert!(!state.piece_can_reach_target_field(&chess_move));
         
         // four to the side three down (should return false)
         let start_field = Field(7,3);
         let target_field = Field(3,0);
-        let chess_move = Move::new(&start_field, &target_field, game.position_matrix().borrow());
-        assert!(!game.piece_can_reach_target_field(&chess_move));
+        let chess_move = Move::new(&start_field, &target_field, state.position_matrix().borrow());
+        assert!(!state.piece_can_reach_target_field(&chess_move));
     } 
  
     // this test is pretty much a dummy, since the method always returns true
@@ -1053,65 +1047,65 @@ mod tests {
     #[test]
     fn pawn_has_path_to_target_field() {
         let fen_start_string = "r2qkbnr/ppp2ppp/2np4/4p3/3PP1b1/1PP2N2/P4PPP/RNBQKB1R b KQkq d3 0 5";
-        let game = State::load_game_from_fen(fen_start_string);           
+        let state = State::load_game_from_fen(fen_start_string);           
         let start_field = Field(4,4);
         let target_field = Field(3,3);
-        let chess_move = Move::new(&start_field, &target_field, game.position_matrix().borrow());
-        assert!(State::piece_has_path_to_target_field(&game, &chess_move));
+        let chess_move = Move::new(&start_field, &target_field, state.position_matrix().borrow());
+        assert!(State::piece_has_path_to_target_field(&state, &chess_move));
     }
     
     #[test]
     fn rook_has_path_to_target_field() {
         let fen_start_string = "r2q1rk1/ppp1bppp/3p1n2/6B1/2BNP3/1P6/P4PPP/RN1K3R w - - 5 11";
-        let game = State::load_game_from_fen(fen_start_string);           
+        let state = State::load_game_from_fen(fen_start_string);           
 
         let start_field = Field(0,7);
         let target_field = Field(0,4);
-        let chess_move = Move::new(&start_field, &target_field, game.position_matrix().borrow());
-        assert!(State::piece_has_path_to_target_field(&game, &chess_move));
+        let chess_move = Move::new(&start_field, &target_field, state.position_matrix().borrow());
+        assert!(State::piece_has_path_to_target_field(&state, &chess_move));
         
         let start_field = Field(0,0);
         let target_field = Field(4,0);
-        let chess_move = Move::new(&start_field, &target_field, game.position_matrix().borrow());
-        assert!(!State::piece_has_path_to_target_field(&game, &chess_move));
+        let chess_move = Move::new(&start_field, &target_field, state.position_matrix().borrow());
+        assert!(!State::piece_has_path_to_target_field(&state, &chess_move));
         
         let start_field = Field(0,0);
         let target_field = Field(0,4);
-        let chess_move = Move::new(&start_field, &target_field, game.position_matrix().borrow());
-        assert!(!State::piece_has_path_to_target_field(&game, &chess_move));
+        let chess_move = Move::new(&start_field, &target_field, state.position_matrix().borrow());
+        assert!(!State::piece_has_path_to_target_field(&state, &chess_move));
     }
     
     #[test]
     fn bishop_has_path_to_target_field() {  
         let fen_start_string = "r1bqkbnr/pppp1ppp/2n5/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 2 3";
-        let mut game = State::load_game_from_fen(fen_start_string);           
+        let state = State::load_game_from_fen(fen_start_string);           
     
         let start_field = Field(0,5);
         let target_field = Field(4,1);
-        let chess_move = Move::new(&start_field, &target_field, game.position_matrix().borrow());
-        assert!(State::piece_has_path_to_target_field(&game, &chess_move));
+        let chess_move = Move::new(&start_field, &target_field, state.position_matrix().borrow());
+        assert!(State::piece_has_path_to_target_field(&state, &chess_move));
         
-        game.execute_move(chess_move);
+        let new_state = state.execute_move(chess_move);
         let start_field = Field(7,2);
         let target_field = Field(3,6);
-        let chess_move = Move::new(&start_field, &target_field, game.position_matrix().borrow());
-        assert!(!State::piece_has_path_to_target_field(&game, &chess_move));
+        let chess_move = Move::new(&start_field, &target_field, new_state.position_matrix().borrow());
+        assert!(!State::piece_has_path_to_target_field(&new_state, &chess_move));
     }
     
     #[test]
     fn queen_has_path_to_target_field() {
         let fen_start_string = "r1b1kb1r/pp1ppppp/1q3n2/8/2BQP3/8/PPP2PPP/RNB1K2R w KQkq - 3 7";
-        let game = State::load_game_from_fen(fen_start_string);           
+        let state = State::load_game_from_fen(fen_start_string);           
     
         let start_field = Field(3,3);
         let target_field = Field(5,1);
-        let chess_move = Move::new(&start_field, &target_field, game.position_matrix().borrow());
-        assert!(State::piece_has_path_to_target_field(&game, &chess_move));
+        let chess_move = Move::new(&start_field, &target_field, state.position_matrix().borrow());
+        assert!(State::piece_has_path_to_target_field(&state, &chess_move));
 
         let start_field = Field(3,3);
         let target_field = Field(6,0);
-        let chess_move = Move::new(&start_field, &target_field, game.position_matrix().borrow());
-        assert!(!State::piece_has_path_to_target_field(&game, &chess_move));
+        let chess_move = Move::new(&start_field, &target_field, state.position_matrix().borrow());
+        assert!(!State::piece_has_path_to_target_field(&state, &chess_move));
     }
 
 
@@ -1127,96 +1121,96 @@ mod tests {
     #[test]
     fn load_game_from_fen_new() {
         let fen_start_string = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
-        let game = State::load_game_from_fen(fen_start_string);           
-        assert_eq!(game.position().borrow().0, "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR");
-        assert_eq!(game.turn, Color::White);
-        assert!(game.castle_availability().white_king);
-        assert!(game.castle_availability().white_queen);
-        assert!(game.castle_availability().black_king);
-        assert!(game.castle_availability().black_queen);
-        assert_eq!(game.en_passant, None);
-        assert_eq!(game.halfmove_clock, 0);
-        assert_eq!(game.fullmove_clock, 1);
+        let state = State::load_game_from_fen(fen_start_string);           
+        assert_eq!(state.position().borrow().0, "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR");
+        assert_eq!(state.turn, Color::White);
+        assert!(state.castle_availability().white_king);
+        assert!(state.castle_availability().white_queen);
+        assert!(state.castle_availability().black_king);
+        assert!(state.castle_availability().black_queen);
+        assert_eq!(state.en_passant, None);
+        assert_eq!(state.halfmove_clock, 0);
+        assert_eq!(state.fullmove_clock, 1);
     }
 
     #[test]
     fn load_game_from_fen_sicilian_alapin() {
         let fen_start_string = "rnbqkbnr/pp1ppppp/8/2p5/4P3/2P5/PP1P1PPP/RNBQKBNR b KQkq - 0 2";
-        let game = State::load_game_from_fen(fen_start_string);           
-        assert_eq!(game.position().borrow().0, "rnbqkbnr/pp1ppppp/8/2p5/4P3/2P5/PP1P1PPP/RNBQKBNR");
-        assert_eq!(game.turn, Color::Black);
-        assert!(game.castle_availability().white_king);
-        assert!(game.castle_availability().white_queen);
-        assert!(game.castle_availability().black_king);
-        assert!(game.castle_availability().black_queen);
-        assert_eq!(game.en_passant, None);
-        assert_eq!(game.halfmove_clock, 0);
-        assert_eq!(game.fullmove_clock, 2);
+        let state = State::load_game_from_fen(fen_start_string);           
+        assert_eq!(state.position().borrow().0, "rnbqkbnr/pp1ppppp/8/2p5/4P3/2P5/PP1P1PPP/RNBQKBNR");
+        assert_eq!(state.turn, Color::Black);
+        assert!(state.castle_availability().white_king);
+        assert!(state.castle_availability().white_queen);
+        assert!(state.castle_availability().black_king);
+        assert!(state.castle_availability().black_queen);
+        assert_eq!(state.en_passant, None);
+        assert_eq!(state.halfmove_clock, 0);
+        assert_eq!(state.fullmove_clock, 2);
     }
     
     #[test]
     fn load_game_from_fen_hikaru_harikrishna() {
         let fen_start_string = "r6k/1p1q3p/3r1pp1/b1R1N3/p2PQ3/P5P1/1P3P1P/3R2K1 b - - 0 28";
-        let game = State::load_game_from_fen(fen_start_string);           
-        assert_eq!(game.position().borrow().0, "r6k/1p1q3p/3r1pp1/b1R1N3/p2PQ3/P5P1/1P3P1P/3R2K1");
-        assert_eq!(game.turn, Color::Black);
-        assert!(!game.castle_availability().white_king);
-        assert!(!game.castle_availability().white_queen);
-        assert!(!game.castle_availability().black_king);
-        assert!(!game.castle_availability().black_queen);
-        assert_eq!(game.en_passant, None);
-        assert_eq!(game.halfmove_clock, 0);
-        assert_eq!(game.fullmove_clock, 28);
+        let state = State::load_game_from_fen(fen_start_string);           
+        assert_eq!(state.position().borrow().0, "r6k/1p1q3p/3r1pp1/b1R1N3/p2PQ3/P5P1/1P3P1P/3R2K1");
+        assert_eq!(state.turn, Color::Black);
+        assert!(!state.castle_availability().white_king);
+        assert!(!state.castle_availability().white_queen);
+        assert!(!state.castle_availability().black_king);
+        assert!(!state.castle_availability().black_queen);
+        assert_eq!(state.en_passant, None);
+        assert_eq!(state.halfmove_clock, 0);
+        assert_eq!(state.fullmove_clock, 28);
     }
 
     #[test]
     fn load_game_from_fen_pirc_w_en_passant() {
         let fen_start_string = "rnbqkb1r/pp3ppp/3p1n2/2pPp3/4P3/2N5/PPP2PPP/R1BQKBNR w KQkq c6 0 5";
-        let game = State::load_game_from_fen(fen_start_string);           
-        assert_eq!(game.position().borrow().0, "rnbqkb1r/pp3ppp/3p1n2/2pPp3/4P3/2N5/PPP2PPP/R1BQKBNR");
-        assert_eq!(game.turn, Color::White);
-        assert!(game.castle_availability().white_king);
-        assert!(game.castle_availability().white_queen);
-        assert!(game.castle_availability().black_king);
-        assert!(game.castle_availability().black_queen);
-        assert_eq!(game.en_passant, Some(Field(5,2)));
-        assert_eq!(game.halfmove_clock, 0);
-        assert_eq!(game.fullmove_clock, 5);
+        let state = State::load_game_from_fen(fen_start_string);           
+        assert_eq!(state.position().borrow().0, "rnbqkb1r/pp3ppp/3p1n2/2pPp3/4P3/2N5/PPP2PPP/R1BQKBNR");
+        assert_eq!(state.turn, Color::White);
+        assert!(state.castle_availability().white_king);
+        assert!(state.castle_availability().white_queen);
+        assert!(state.castle_availability().black_king);
+        assert!(state.castle_availability().black_queen);
+        assert_eq!(state.en_passant, Some(Field(5,2)));
+        assert_eq!(state.halfmove_clock, 0);
+        assert_eq!(state.fullmove_clock, 5);
     }
 
     #[test]
     fn load_game_from_fen_castling_partially_available() {
         let fen_start_string = "rnbq1rk1/p3bppp/2pp1n2/4p1B1/2B1P3/2N5/PPP2PPP/R2QK1NR w KQ - 4 8";
-        let game = State::load_game_from_fen(fen_start_string);           
-        assert_eq!(game.position().borrow().0, "rnbq1rk1/p3bppp/2pp1n2/4p1B1/2B1P3/2N5/PPP2PPP/R2QK1NR");
-        assert_eq!(game.turn, Color::White);
-        assert!(game.castle_availability().white_king);
-        assert!(game.castle_availability().white_queen);
-        assert!(!game.castle_availability().black_king);
-        assert!(!game.castle_availability().black_queen);
-        assert_eq!(game.en_passant, None);
-        assert_eq!(game.halfmove_clock, 4);
-        assert_eq!(game.fullmove_clock, 8);
+        let state = State::load_game_from_fen(fen_start_string);           
+        assert_eq!(state.position().borrow().0, "rnbq1rk1/p3bppp/2pp1n2/4p1B1/2B1P3/2N5/PPP2PPP/R2QK1NR");
+        assert_eq!(state.turn, Color::White);
+        assert!(state.castle_availability().white_king);
+        assert!(state.castle_availability().white_queen);
+        assert!(!state.castle_availability().black_king);
+        assert!(!state.castle_availability().black_queen);
+        assert_eq!(state.en_passant, None);
+        assert_eq!(state.halfmove_clock, 4);
+        assert_eq!(state.fullmove_clock, 8);
     }
 
     #[test]
     fn is_player_in_check_01() {
-        let game = State::load_game_from_fen("r1b1kb1r/pp1ppppp/1q3n2/8/2BQP3/8/PPP2PPP/RNB1K2R w KQkq - 3 7");
-        assert!(!game.is_player_in_check(&Color::White));
-        assert!(!game.is_player_in_check(&Color::Black));
+        let state = State::load_game_from_fen("r1b1kb1r/pp1ppppp/1q3n2/8/2BQP3/8/PPP2PPP/RNB1K2R w KQkq - 3 7");
+        assert!(!state.is_player_in_check(&Color::White));
+        assert!(!state.is_player_in_check(&Color::Black));
     }
 
     #[test]
     fn is_player_in_check_02() {
-        let game = State::load_game_from_fen("r1b1kb1r/pp1Qpppp/1q3n2/8/2B1P3/8/PPP2PPP/RNB1K2R b KQkq - 0 7");
-        assert!(!game.is_player_in_check(&Color::White));
-        assert!(game.is_player_in_check(&Color::Black));
+        let state = State::load_game_from_fen("r1b1kb1r/pp1Qpppp/1q3n2/8/2B1P3/8/PPP2PPP/RNB1K2R b KQkq - 0 7");
+        assert!(!state.is_player_in_check(&Color::White));
+        assert!(state.is_player_in_check(&Color::Black));
     }
 
     #[test]
     fn is_player_in_check_03() {
-        let game = State::load_game_from_fen("r3kb1r/pp1bpppp/5n2/6B1/1qB1P3/8/PPP2PPP/RN2K2R w KQkq - 2 9");
-        assert!(game.is_player_in_check(&Color::White));
-        assert!(!game.is_player_in_check(&Color::Black));
+        let state = State::load_game_from_fen("r3kb1r/pp1bpppp/5n2/6B1/1qB1P3/8/PPP2PPP/RN2K2R w KQkq - 2 9");
+        assert!(state.is_player_in_check(&Color::White));
+        assert!(!state.is_player_in_check(&Color::Black));
     }
 }
