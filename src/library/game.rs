@@ -189,7 +189,7 @@ pub enum List {
 impl List {
     fn next(&mut self) -> Option<(State, Box<List>)> {
         match self {
-            List::Cons(state, list) => Some((state, list)),
+            List::Cons(state, list) => Some((*state, *list)),
             List::Nil => None
         }
     }

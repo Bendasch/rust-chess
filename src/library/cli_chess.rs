@@ -19,12 +19,12 @@ const WHITE_PAWN: char    = '\u{2659}';
 
 pub fn run() {
     let mut game = Cons(State::new(), Box::new(Nil));
-    let mut state = game.0.clone();
-    draw_board(state.position());
-    draw_who_to_move(&state.turn());
+    let Cons(state, list_box) = &game;
     loop {
-        state.next_move();
         draw_board(state.position());
+        draw_who_to_move(&state.turn());
+        game.next_move();
+        let Cons(state, list_box) = *list_box;
     }
 }
 
