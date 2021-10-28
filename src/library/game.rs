@@ -66,6 +66,26 @@ impl Move {
         }
     }
 
+    pub fn rank_difference(&self) -> isize {
+        self.target_field.0 as isize - self.start_field.0 as isize
+    }
+
+    pub fn rank_distance(&self) -> usize {
+        isize::abs(self.rank_difference()) as usize
+    }
+
+    pub fn file_difference(&self) -> isize {
+        self.target_field.1 as isize - self.start_field.1 as isize
+    }
+
+    pub fn file_distance(&self) -> usize {
+        isize::abs(self.file_difference()) as usize
+    }
+
+    pub fn distance(&self) -> usize {
+        max(self.rank_distance(), self.file_distance())
+    }
+
     // for now we assume the syntax "AABB", where
     // AA are the indices of the source field (i.e., 52) [offset by 1]
     // BB are the indices of the target field (i.e., 54) [offset by 1]   
@@ -174,8 +194,10 @@ impl PositionMatrix {
         &self.0[field.0][field.1].piecetype()
     }
 
-    fn empty_field(&mut self, field: &Field) {
+    fn take_piece(&mut self, field: &Field) -> Piece {
+        let piece = self.0[field.0][field.1]; 
         self.0[field.0][field.1] = Piece{color: Color::None, piecetype: PieceType::None};
+        piece
     }
 
     fn place_piece(&mut self, piece: Piece, field: &Field) {
@@ -196,12 +218,15 @@ pub struct State {
 
 impl<'a> State {
 
-    pub fn new() -> State {
-        let fen_start_string = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+    pub fn new(fen: Option<String>) -> State {
+        let fen_start_string = match fen {
+            Some(fen) => fen,
+            None => String::from("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
+        };
         State::load_game_from_fen(fen_start_string)    
     }
     
-    pub fn load_game_from_fen(fen_string: &str) -> State {
+    pub fn load_game_from_fen(fen_string: String) -> State {
         
         let game_state_vec: Vec<&str> = fen_string.split(' ').collect();
         
@@ -413,13 +438,11 @@ impl<'a> State {
 
     fn piece_can_reach_target_field(&self, chess_move: &Move) -> bool {
         
-        let rank_diff: isize = chess_move.target_field().0 as isize - chess_move.start_field().0 as isize;
-        let file_diff: isize = chess_move.target_field().1 as isize - chess_move.start_field().1 as isize;
+        let rank_diff = chess_move.rank_difference();
+        let file_diff = chess_move.file_difference();
         let rank_diff_abs = isize::abs(rank_diff);
         let file_diff_abs = isize::abs(file_diff);
-        
-        //println!("Piece: {:?}, abs rank diff {}, abs file diff {}", chess_move.piece().piecetype(), rank_diff_abs, file_diff_abs);
-        
+                
         match chess_move.piece().piecetype() {
 
             // regular moves
@@ -431,13 +454,13 @@ impl<'a> State {
             // regular + special moves for king and pawn
             PieceType::King if chess_move.piece().color() == &Color::White => {
                 (rank_diff_abs <= 1 && file_diff_abs <= 1 && (rank_diff_abs + file_diff_abs) >= 1) ||
-                (chess_move.target_field().0 == 0 && chess_move.target_field().1 == 0 && self.castle_availability().white_queen) ||
-                (chess_move.target_field().0 == 0 && chess_move.target_field().1 == 7 && self.castle_availability().white_king)
+                (chess_move.target_field().0 == 0 && chess_move.target_field().1 == 2 && self.castle_availability().white_queen) ||
+                (chess_move.target_field().0 == 0 && chess_move.target_field().1 == 6 && self.castle_availability().white_king)
             },
             PieceType::King if chess_move.piece().color() == &Color::Black => {
                 (rank_diff_abs <= 1 && file_diff_abs <= 1 && (rank_diff_abs + file_diff_abs) >= 1) ||
-                (chess_move.target_field().0 == 0 && chess_move.target_field().1 == 0 && self.castle_availability().white_queen) ||
-                (chess_move.target_field().0 == 0 && chess_move.target_field().1 == 7 && self.castle_availability().white_king)
+                (chess_move.target_field().0 == 7 && chess_move.target_field().1 == 2 && self.castle_availability().white_queen) ||
+                (chess_move.target_field().0 == 7 && chess_move.target_field().1 == 6 && self.castle_availability().white_king)
             },
             PieceType::Pawn if chess_move.piece().color() == &Color::White => { 
                 (rank_diff == 1 && file_diff_abs == 0) || 
@@ -499,7 +522,8 @@ impl<'a> State {
             return false;
         }
         
-        let file_diff: isize = chess_move.target_field().1 as isize - chess_move.start_field().1 as isize;
+
+        let file_diff = chess_move.file_difference();
         let file_diff_abs = isize::abs(file_diff);
         if file_diff_abs < 2 {
             return false;
@@ -534,7 +558,7 @@ impl<'a> State {
 
                 let chess_move = Move::new(&Field(i,j), field, self.position_matrix().borrow());   
                 if State::piece_can_reach_target_field(&self, &chess_move) && State::piece_has_path_to_target_field(&self, &chess_move) { 
-                    println!("{:?} is attacking field {:?}", piece, field);
+                    println!("{:?} is attacking field {:?} (move: {:?}", piece, field, chess_move);
                     return true;
                 }
             }
@@ -543,8 +567,30 @@ impl<'a> State {
         false
     }
 
-    fn move_rook_when_castling(&self, _chess_move: &Move) {
-        println!("Not implemented yet.");
+    fn move_rook_when_castling(&self, chess_move: &Move) {
+        
+        if chess_move.piece().piecetype() != &PieceType::King {
+            return; // not castling
+        }
+
+        let distance = chess_move.file_distance();
+        if distance < 2 {
+            return; // not castling
+        }
+
+        let direction = chess_move.file_difference() / distance as isize;
+
+        // remove rook
+        let rook_start_field = match direction {
+            1  => Field(chess_move.target_field().0, 7),
+            -1 => Field(chess_move.target_field().0, 0),
+            _  => panic!("Something terrible happened: {:?}", direction) 
+        };
+        let rook = self.position_matrix().borrow_mut().take_piece(&rook_start_field);
+        
+        // place rook again
+        let rook_target_field = Field(chess_move.target_field().0, chess_move.target_field().1 - direction as usize);
+        self.position_matrix().borrow_mut().place_piece(rook, &rook_target_field);
     }
     
     fn remove_enemy_pawn_en_passant(&self, _chess_move: &Move) {
@@ -556,7 +602,7 @@ impl<'a> State {
         let mut new_state = self.clone();
 
         // 1) remove the piece from it's current field
-        new_state.position_matrix().borrow_mut().empty_field(&chess_move.start_field);
+        new_state.position_matrix().borrow_mut().take_piece(&chess_move.start_field);
     
         // 2) replace the new field with the piece
         new_state.position_matrix().borrow_mut().place_piece(chess_move.piece, &chess_move.target_field);
@@ -627,7 +673,7 @@ mod tests {
     
     #[test]
     fn new_game() {
-        let state = State::new();
+        let state = State::new(None);
         assert_eq!(state.position().borrow().0, "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR");
         assert_eq!(state.position_matrix().borrow().0[0][0], Piece{color: Color::White, piecetype: PieceType::Rook});
         assert_eq!(state.position_matrix().borrow().0[0][1], Piece{color: Color::White, piecetype: PieceType::Knight});
@@ -665,15 +711,15 @@ mod tests {
 
     #[test]
     fn matrix_empty_field() {
-        let state = State::new();
+        let state = State::new(None);
         assert!(state.is_piece_on_field(&Field(0,0)));
-        state.position_matrix().borrow_mut().empty_field(&Field(0,0));
+        state.position_matrix().borrow_mut().take_piece(&Field(0,0));
         assert!(!state.is_piece_on_field(&Field(0,0)));
     }
 
     #[test]
     fn new_move() {
-        let state = State::new();
+        let state = State::new(None);
         let start_field = Field(1,4);
         let target_field = Field(3,4);
         let chess_move = Move::new(&start_field, &target_field, state.position_matrix().borrow());
@@ -691,7 +737,7 @@ mod tests {
 
     #[test]
     fn matrix_execute_move() {
-        let state = State::new();
+        let state = State::new(None);
         
         let start_field = Field(1,4);
         let target_field = Field(3,4);
@@ -707,7 +753,7 @@ mod tests {
     #[test]
     fn update_position_from_matrix() {
 
-        let state = State::new();
+        let state = State::new(None);
         assert_eq!(state.position().borrow().0, "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR");
         
         // make a move         
@@ -730,7 +776,7 @@ mod tests {
 
     #[test]
     fn is_move_legal() {
-        let state = State::new();
+        let state = State::new(None);
 
         // legal move
         let start_field = Field(0,1);
@@ -747,14 +793,14 @@ mod tests {
 
     #[test]
     fn is_players_turn() {
-        let state = State::new();
+        let state = State::new(None);
         assert!(state.is_players_turn(&Color::White));
         assert!(!state.is_players_turn(&Color::Black));
     }
 
     #[test]
     fn pawn_can_reach_target_field() {       
-        let state = State::new();
+        let state = State::new(None);
         
         // single up        
         let start_field = Field(1,4);
@@ -817,7 +863,7 @@ mod tests {
     
     #[test]
     fn king_can_reach_target_field() {       
-        let state = State::new();
+        let state = State::new(None);
         
         // single up        
         let start_field = Field(0,4);
@@ -845,13 +891,13 @@ mod tests {
 
         // castle queen-side        
         let start_field = Field(0,4);
-        let target_field = Field(0,0);
+        let target_field = Field(0,2);
         let chess_move = Move::new(&start_field, &target_field, state.position_matrix().borrow());
         assert!(state.piece_can_reach_target_field(&chess_move));
     
         // castle king-side        
         let start_field = Field(0,4);
-        let target_field = Field(0,7);
+        let target_field = Field(0,6);
         let chess_move = Move::new(&start_field, &target_field, state.position_matrix().borrow());
         assert!(state.piece_can_reach_target_field(&chess_move));    
     
@@ -860,7 +906,7 @@ mod tests {
 
     #[test]
     fn knight_can_reach_target_field() {       
-        let state = State::new();
+        let state = State::new(None);
         
         // two up one right        
         let start_field = Field(0,1);
@@ -919,7 +965,7 @@ mod tests {
     
     #[test]
     fn bishop_can_reach_target_field() {       
-        let state = State::new();
+        let state = State::new(None);
     
         // one diagonal up
         let start_field = Field(0,2);
@@ -973,7 +1019,7 @@ mod tests {
  
     #[test]
     fn rook_can_reach_target_field() {       
-        let state = State::new();
+        let state = State::new(None);
         
         // one up
         let start_field = Field(0,0);
@@ -1026,7 +1072,7 @@ mod tests {
  
     #[test]
     fn queen_can_reach_target_field() {       
-        let state = State::new();
+        let state = State::new(None);
     
         // one diagonal up
         let start_field = Field(0,3);
@@ -1345,4 +1391,24 @@ mod tests {
         let chess_move = Move::new(&Field(7,4), &Field(7,6), state.position_matrix().borrow());
         assert!(state.is_castling_through_check(&chess_move));        
     }
+
+    #[test]
+    fn castle_white_kingside() {
+        let state = State::load_game_from_fen("r1bqk1nr/pppp1ppp/2n5/2b1p3/2B1P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 4 4");
+        let chess_move = Move::new(&Field(0,4), &Field(0,6), state.position_matrix().borrow());
+        let new_state = state.execute_move(&chess_move);
+        new_state.position().borrow_mut().update_from_matrix(new_state.position_matrix().borrow());
+        assert_eq!(new_state.position().borrow().0, "r1bqk1nr/pppp1ppp/2n5/2b1p3/2B1P3/5N2/PPPP1PPP/RNBQ1RK1");
+        assert_eq!(new_state.position_matrix().borrow().0[0][5], Piece{color: Color::White, piecetype: PieceType::Rook});
+        assert_eq!(new_state.position_matrix().borrow().0[0][6], Piece{color: Color::White, piecetype: PieceType::King});
+    }
+    
+    #[test]
+    fn castle_white_queenside() {}
+    
+    #[test]
+    fn castle_black_kingside() {}
+
+    #[test]
+    fn castle_black_queenside() {}
 }

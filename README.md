@@ -1,5 +1,7 @@
 # DOING
-En passant & castling
+- test castling in the actual game by loading FEN string
+- implement en passant
+- test en passant 
 
 # TODO
 - [x] Assert that a proper piece was selected (no empty field, right color)

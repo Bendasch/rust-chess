@@ -19,9 +19,9 @@ const BLACK_KING: char    = '\u{2654}';
 const BLACK_PAWN: char    = '\u{2659}';
 //const EMPTY: char         = '\u{0020}';
 
-pub fn run() {
+pub fn run(fen: Option<String>) {
     let mut game: LinkedList<State> = LinkedList::new();
-    game.push_back(State::new());
+    game.push_back(State::new(fen));
     loop {
         draw_board(game.back().unwrap().position().borrow());
         draw_who_to_move(game.back().unwrap().turn());

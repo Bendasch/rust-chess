@@ -16,6 +16,7 @@ impl fmt::Display for GuiType {
 }
 pub struct Config {
     pub gui_type: GuiType,
+    pub fen: Option<String>
 }
 
 impl Config {
@@ -30,6 +31,8 @@ impl Config {
             None => return Err("Please enter a valid GUI type (cli / bevy).")
         };
 
-        Ok(Config { gui_type })
+        let fen = args.next();
+
+        Ok(Config { gui_type, fen })
     }
 }
