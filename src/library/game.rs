@@ -371,13 +371,13 @@ impl<'a> State {
         }
         
         // assert that the piece has the proper color
-        if !self.is_players_turn(&chess_move.piece().color()) {
+        if !self.is_players_turn(chess_move.piece().color()) {
             return false;
         }
         
         // assert that the piece is allowed to move from the start to the target field 
         // this includes asserting that castling or en-passant are available
-        if !self.piece_can_reach_target_field(&chess_move) { 
+        if !self.piece_can_reach_target_field(chess_move) { 
             return false;
         }
 
@@ -387,7 +387,7 @@ impl<'a> State {
         }
 
         // assert that the way to the target field is not blocked
-        if !self.piece_has_path_to_target_field(&chess_move) { 
+        if !self.piece_has_path_to_target_field(chess_move) { 
             return false;
         }
 
@@ -400,6 +400,9 @@ impl<'a> State {
         }
         
         // in case of castling, assert that the kings does not move through check
+        if self.is_castling_through_check(chess_move) { 
+            return false;
+        } 
 
         true
     }
@@ -458,7 +461,6 @@ impl<'a> State {
     
     fn piece_has_path_to_target_field(&self, chess_move: &Move) -> bool {
         
-        
         match chess_move.piece().piecetype() {
             PieceType::Pawn | PieceType::King | PieceType::Knight => true, 
             PieceType::Rook | PieceType::Bishop | PieceType::Queen  => {
@@ -491,6 +493,64 @@ impl<'a> State {
         }
     }  
 
+    fn is_castling_through_check(&self, chess_move: &Move) -> bool {
+
+        if chess_move.piece().piecetype() != &PieceType::King {
+            return false;
+        }
+        
+        let file_diff: isize = chess_move.target_field().1 as isize - chess_move.start_field().1 as isize;
+        let file_diff_abs = isize::abs(file_diff);
+        if file_diff_abs < 2 {
+            return false;
+        };
+        
+        // for all fields in the kings path
+        // check whether an enemy piece is attacking it
+        // note that the target field is _not_ checked!
+        let enemy_color: Color = match self.turn() {
+            &Color::White => Color::Black,
+            &Color::Black => Color::White,
+            _ => panic!("No valid player color requested!")
+        };
+        let direction = file_diff / file_diff_abs;
+        for i in 0..(file_diff_abs+1) {
+            let field: Field = Field(chess_move.start_field().0, (chess_move.start_field().1 as isize + direction * i) as usize);
+            if self.is_players_piece_attacking_field(&enemy_color, &field) {
+                return true;
+            }
+        }
+        return false;
+    }
+    
+    fn is_players_piece_attacking_field(&self, player: &Color, field: &Field) -> bool {
+        
+        for (i, rank) in self.position_matrix().borrow().0.iter().enumerate() {
+            for (j, piece) in rank.iter().enumerate() {
+                
+                if piece.color() != player {
+                    continue;
+                } 
+
+                let chess_move = Move::new(&Field(i,j), field, self.position_matrix().borrow());   
+                if State::piece_can_reach_target_field(&self, &chess_move) && State::piece_has_path_to_target_field(&self, &chess_move) { 
+                    println!("{:?} is attacking field {:?}", piece, field);
+                    return true;
+                }
+            }
+        }
+        
+        false
+    }
+
+    fn move_rook_when_castling(&self, _chess_move: &Move) {
+        println!("Not implemented yet.");
+    }
+    
+    fn remove_enemy_pawn_en_passant(&self, _chess_move: &Move) {
+        println!("Not implemented yet.");
+    }
+
     fn execute_move(&self, chess_move: &Move) -> State {
 
         let mut new_state = self.clone();
@@ -501,7 +561,13 @@ impl<'a> State {
         // 2) replace the new field with the piece
         new_state.position_matrix().borrow_mut().place_piece(chess_move.piece, &chess_move.target_field);
 
-        // 3) Change the turn
+        // 3.1) handle castling
+        new_state.move_rook_when_castling(chess_move);
+        
+        // 3.2) handle en-passant
+        new_state.remove_enemy_pawn_en_passant(chess_move);
+
+        // 4) Change the turn
         new_state.toggle_turn();
         
         new_state
@@ -549,28 +615,8 @@ impl<'a> State {
         };
 
         let king_field: Field = State::get_king_field(self.position_matrix().borrow(), player).unwrap();
-
-        // loop over all fields
-        // > when we find an enemy piece
-        // >> check whether it can reach the king
-        // >>> if we find the king, return true
-        // otherwise return false  
-        for (i, rank) in self.position_matrix().borrow().0.iter().enumerate() {
-            for (j, piece) in rank.iter().enumerate() {
-                
-                if piece.color() != &enemy_color {
-                    continue;
-                } 
-
-                let chess_move = Move::new(&Field(i,j), &king_field, self.position_matrix().borrow());   
-                if State::piece_can_reach_target_field(&self, &chess_move) && State::piece_has_path_to_target_field(&self, &chess_move) { 
-                    println!("{:?} can reach king on {:?}", piece, king_field);
-                    return true;
-                }
-            }
-        }
-
-        false
+        
+        self.is_players_piece_attacking_field(&enemy_color, &king_field)
     }
 }
 
@@ -1241,11 +1287,62 @@ mod tests {
         let chess_move = Move::new(&Field(0,4), &Field(1,4), state.position_matrix().borrow());
         assert!(!state.is_move_legal(&chess_move));
     }
-     
+    
     #[test]
     fn is_move_legal_king_does_not_run_into_check() {
         let state = State::load_game_from_fen("r2qkbnr/pppb1ppp/2np4/1B2p3/4P3/2N2N2/PPPP1PPP/R1BQK2R w KQkq - 2 5");
         let chess_move = Move::new(&Field(0,4), &Field(1,4), state.position_matrix().borrow());
         assert!(state.is_move_legal(&chess_move));
+    }
+    
+    #[test]
+    fn is_players_piece_attacking_field_pawn() {
+        let state = State::load_game_from_fen("rnbqkbnr/ppp1pppp/8/3p4/4P3/8/PPPP1PPP/RNBQKBNR w KQkq d6 0 2");
+        assert!(state.is_players_piece_attacking_field(&Color::White, &Field(4,3)));
+    }
+    
+    #[test]
+    fn is_players_piece_attacking_field_knight() {
+        let state = State::load_game_from_fen("r1bqkbnr/ppp1pppp/2n5/1B6/8/2N2N2/PPPP1PPP/R1BQK2R b KQkq - 5 5");
+        assert!(state.is_players_piece_attacking_field(&Color::Black, &Field(3,3)));
+    }
+    
+    #[test]
+    fn is_players_piece_attacking_field_bishop() {
+        let state = State::load_game_from_fen("r1bqkb1r/ppp1pppp/2n2n2/1B6/8/2N2N2/PPPP1PPP/R1BQK2R w KQkq - 6 6");
+        assert!(state.is_players_piece_attacking_field(&Color::White, &Field(5,2)));
+    }
+    
+    #[test]
+    fn is_players_piece_attacking_field_bishop_blocked() {
+        let state = State::load_game_from_fen("r1bqkb1r/ppp1pppp/2n2n2/1B6/8/2N2N2/PPPP1PPP/R1BQK2R w KQkq - 6 6");
+        assert!(!state.is_players_piece_attacking_field(&Color::White, &Field(7,4)));
+    }
+    
+    #[test]
+    fn is_players_piece_attacking_field_rook_blocked() {
+        let state = State::load_game_from_fen("r1bqkb1r/ppp1pppp/2n2n2/1B6/8/2N2N2/PPPP1PPP/R1BQ1RK1 b kq - 7 6");
+        assert!(!state.is_players_piece_attacking_field(&Color::Black, &Field(1,7)));
+    }
+    
+    #[test]
+    fn is_castling_through_check_no_check() {
+        let state = State::load_game_from_fen("r1bqkb1r/ppp1pppp/2n2n2/1B6/8/2N2N2/PPPP1PPP/R1BQK2R w KQkq - 6 6");
+        let chess_move = Move::new(&Field(0,4), &Field(0,6), state.position_matrix().borrow());
+        assert!(!state.is_castling_through_check(&chess_move));
+    }
+    
+    #[test]
+    fn is_castling_through_check_in_check() {
+        let state = State::load_game_from_fen("r1bqk2r/ppp2ppp/2B1pn2/8/1b6/2N2N2/PPPP1PPP/R1B1QRK1 b kq - 0 8");
+        let chess_move = Move::new(&Field(7,4), &Field(7,6), state.position_matrix().borrow());
+        assert!(state.is_castling_through_check(&chess_move));
+    }
+    
+    #[test]
+    fn is_castling_through_check_through_check() {
+        let state = State::load_game_from_fen("r2qk2r/p1p2ppp/b1p1pn2/8/8/BPP2N2/P1P2PPP/R3QRK1 b kq - 2 11");
+        let chess_move = Move::new(&Field(7,4), &Field(7,6), state.position_matrix().borrow());
+        assert!(state.is_castling_through_check(&chess_move));        
     }
 }

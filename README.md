@@ -1,5 +1,5 @@
 # DOING
-is_move_legal()
+En passant & castling
 
 # TODO
 - [x] Assert that a proper piece was selected (no empty field, right color)
@@ -13,11 +13,12 @@ is_move_legal()
 - [x] Logic to discern whether a player is in check in a given position
 - [x] Basic logic to undo a move (not yet connected to UI)
 - [x] Assert that the move will not result in the player being in check
-- [ ] Assert that the king doesn't move through check when castling
+- [x] Assert that the king doesn't move through check when castling
 - [ ] Implement en-passant and castling in the move execution
 
 # BACKLOG
 * Checkmate and stalemate
+* Add some licence
 * AI making legal moves
 * Don't panic on illegal moves!
 * Graceful exit
