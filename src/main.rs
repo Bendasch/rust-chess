@@ -22,7 +22,7 @@ fn main() {
 
 fn run(config: Config) -> Result<(),Box<dyn Error>> {
     match config.gui_type {
-        GuiType::CLI => cli_chess::run(), 
+        GuiType::CLI => cli_chess::run(config.fen), 
         GuiType::Bevy => bevy_chess::run()
     }
     Ok(())

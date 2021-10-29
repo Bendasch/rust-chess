@@ -92,7 +92,6 @@ impl Move {
     // -> 2545 is equivalent to "e4" in standard notation.
     fn new(start_field: &Field, target_field: &Field, position_matrix: Ref<PositionMatrix>) -> Move {
 
-
         let piece = position_matrix.get_piece_on_field(&start_field);
         Move {
             piece: piece,
@@ -304,6 +303,10 @@ impl<'a> State {
         &self.castle_availability
     }
 
+    pub fn en_passant(&self) -> &Option<Field> {
+        &self.en_passant
+    }
+
     fn init_matrix(start_position: &Position) -> RefCell<PositionMatrix> {
         let mut matrix: Vec<Vec<Piece>> = Vec::new();
         let ranks: Vec<&str> = start_position.split();
@@ -465,17 +468,33 @@ impl<'a> State {
             PieceType::Pawn if chess_move.piece().color() == &Color::White => { 
                 (rank_diff == 1 && file_diff_abs == 0) || 
                 (rank_diff == 2 && chess_move.start_field().0 == 1 && file_diff == 0) ||
-                (rank_diff == 1 && file_diff_abs == 1 && (   
-                    self.position_matrix().borrow().get_type_of_piece_on_field(chess_move.target_field()) != &PieceType::None &&
-                    self.position_matrix().borrow().get_color_of_piece_on_field(chess_move.target_field()) == &Color::Black
+                (rank_diff == 1 && file_diff_abs == 1 && (
+                    (   
+                        self.position_matrix().borrow().get_type_of_piece_on_field(chess_move.target_field()) != &PieceType::None &&
+                        self.position_matrix().borrow().get_color_of_piece_on_field(chess_move.target_field()) == &Color::Black
+                    ) ||
+                    (
+                        match self.en_passant() {
+                            Some(field) => field == &chess_move.target_field, 
+                            None => false
+                        } 
+                    )
                 ))
             },
             PieceType::Pawn if chess_move.piece().color() == &Color::Black => { 
                 (rank_diff == -1 && file_diff_abs == 0) || 
                 (rank_diff == -2 && chess_move.start_field().0 == 6 && file_diff == 0) ||
-                (rank_diff == -1 && file_diff_abs == 1 && (   
-                    self.position_matrix().borrow().get_type_of_piece_on_field(chess_move.target_field()) != &PieceType::None &&
-                    self.position_matrix().borrow().get_color_of_piece_on_field(chess_move.target_field()) == &Color::White
+                (rank_diff == -1 && file_diff_abs == 1 && (
+                    (   
+                        self.position_matrix().borrow().get_type_of_piece_on_field(chess_move.target_field()) != &PieceType::None &&
+                        self.position_matrix().borrow().get_color_of_piece_on_field(chess_move.target_field()) == &Color::White
+                    ) ||
+                    (
+                        match self.en_passant() {
+                            Some(field) => field == &chess_move.target_field, 
+                            None => false
+                        } 
+                    )
                 ))
             },
             _ => panic!("Move not properly processed. {:?}", chess_move) 
@@ -589,16 +608,44 @@ impl<'a> State {
         let rook = self.position_matrix().borrow_mut().take_piece(&rook_start_field);
         
         // place rook again
-        let rook_target_field = Field(chess_move.target_field().0, chess_move.target_field().1 - direction as usize);
+        let rook_target_field = Field(chess_move.target_field().0, (chess_move.target_field().1 as isize - direction) as usize);
         self.position_matrix().borrow_mut().place_piece(rook, &rook_target_field);
     }
     
-    fn remove_enemy_pawn_en_passant(&self, _chess_move: &Move) {
-        println!("Not implemented yet.");
+    fn remove_enemy_pawn_en_passant(&self, chess_move: &Move) {
+        
+        if chess_move.piece().piecetype() != &PieceType::Pawn {
+            return; // not en-passant
+        }
+        
+        let target = chess_move.target_field();
+        
+        match self.en_passant() {
+            None => {
+                return
+            }, // not en-passant
+            Some(field) => {
+                
+                // the en passant position in FEN notation is the field 
+                // behind the pawn that just moved two squares, 
+                // i.e. the field that the enemy pawn can move
+                if field != target {
+                    return // not en-passant
+                }
+            }
+        }
+
+        // we need to remove the pawn from the field 
+        // just below/above the target field (depending on the color)
+        if self.turn() == &Color::White {
+            self.position_matrix().borrow_mut().take_piece(&Field(target.0-1, target.1));
+        } else {
+            self.position_matrix().borrow_mut().take_piece(&Field(target.0+1, target.1));
+        }
     }
 
     fn execute_move(&self, chess_move: &Move) -> State {
-
+        
         let mut new_state = self.clone();
 
         // 1) remove the piece from it's current field
@@ -855,10 +902,6 @@ mod tests {
         let target_field = Field(5,4);
         let chess_move = Move::new(&start_field, &target_field, state.position_matrix().borrow());
         assert!(!state.piece_can_reach_target_field(&chess_move));
-        
-        // TODO: Check diagonal when enemy piece is there
-        // TODO: Check en-passant when available
-        // TODO: Chess en-passant when not available
     }
     
     #[test]
@@ -1145,7 +1188,7 @@ mod tests {
     // for the same reason, there are no tests for king and knight
     #[test]
     fn pawn_has_path_to_target_field() {
-        let fen_start_string = "r2qkbnr/ppp2ppp/2np4/4p3/3PP1b1/1PP2N2/P4PPP/RNBQKB1R b KQkq d3 0 5";
+        let fen_start_string = String::from("r2qkbnr/ppp2ppp/2np4/4p3/3PP1b1/1PP2N2/P4PPP/RNBQKB1R b KQkq d3 0 5");
         let state = State::load_game_from_fen(fen_start_string);           
         let start_field = Field(4,4);
         let target_field = Field(3,3);
@@ -1155,7 +1198,7 @@ mod tests {
     
     #[test]
     fn rook_has_path_to_target_field() {
-        let fen_start_string = "r2q1rk1/ppp1bppp/3p1n2/6B1/2BNP3/1P6/P4PPP/RN1K3R w - - 5 11";
+        let fen_start_string = String::from("r2q1rk1/ppp1bppp/3p1n2/6B1/2BNP3/1P6/P4PPP/RN1K3R w - - 5 11");
         let state = State::load_game_from_fen(fen_start_string);           
 
         let start_field = Field(0,7);
@@ -1176,7 +1219,7 @@ mod tests {
     
     #[test]
     fn bishop_has_path_to_target_field() {  
-        let fen_start_string = "r1bqkbnr/pppp1ppp/2n5/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 2 3";
+        let fen_start_string = String::from("r1bqkbnr/pppp1ppp/2n5/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 2 3");
         let state = State::load_game_from_fen(fen_start_string);           
     
         let start_field = Field(0,5);
@@ -1193,7 +1236,7 @@ mod tests {
     
     #[test]
     fn queen_has_path_to_target_field() {
-        let fen_start_string = "r1b1kb1r/pp1ppppp/1q3n2/8/2BQP3/8/PPP2PPP/RNB1K2R w KQkq - 3 7";
+        let fen_start_string = String::from("r1b1kb1r/pp1ppppp/1q3n2/8/2BQP3/8/PPP2PPP/RNB1K2R w KQkq - 3 7");
         let state = State::load_game_from_fen(fen_start_string);           
     
         let start_field = Field(3,3);
@@ -1219,7 +1262,7 @@ mod tests {
      */
     #[test]
     fn load_game_from_fen_new() {
-        let fen_start_string = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+        let fen_start_string = String::from("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
         let state = State::load_game_from_fen(fen_start_string);           
         assert_eq!(state.position().borrow().0, "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR");
         assert_eq!(state.turn, Color::White);
@@ -1234,7 +1277,7 @@ mod tests {
 
     #[test]
     fn load_game_from_fen_sicilian_alapin() {
-        let fen_start_string = "rnbqkbnr/pp1ppppp/8/2p5/4P3/2P5/PP1P1PPP/RNBQKBNR b KQkq - 0 2";
+        let fen_start_string = String::from("rnbqkbnr/pp1ppppp/8/2p5/4P3/2P5/PP1P1PPP/RNBQKBNR b KQkq - 0 2");
         let state = State::load_game_from_fen(fen_start_string);           
         assert_eq!(state.position().borrow().0, "rnbqkbnr/pp1ppppp/8/2p5/4P3/2P5/PP1P1PPP/RNBQKBNR");
         assert_eq!(state.turn, Color::Black);
@@ -1249,7 +1292,7 @@ mod tests {
     
     #[test]
     fn load_game_from_fen_hikaru_harikrishna() {
-        let fen_start_string = "r6k/1p1q3p/3r1pp1/b1R1N3/p2PQ3/P5P1/1P3P1P/3R2K1 b - - 0 28";
+        let fen_start_string = String::from("r6k/1p1q3p/3r1pp1/b1R1N3/p2PQ3/P5P1/1P3P1P/3R2K1 b - - 0 28");
         let state = State::load_game_from_fen(fen_start_string);           
         assert_eq!(state.position().borrow().0, "r6k/1p1q3p/3r1pp1/b1R1N3/p2PQ3/P5P1/1P3P1P/3R2K1");
         assert_eq!(state.turn, Color::Black);
@@ -1264,7 +1307,7 @@ mod tests {
 
     #[test]
     fn load_game_from_fen_pirc_w_en_passant() {
-        let fen_start_string = "rnbqkb1r/pp3ppp/3p1n2/2pPp3/4P3/2N5/PPP2PPP/R1BQKBNR w KQkq c6 0 5";
+        let fen_start_string = String::from("rnbqkb1r/pp3ppp/3p1n2/2pPp3/4P3/2N5/PPP2PPP/R1BQKBNR w KQkq c6 0 5");
         let state = State::load_game_from_fen(fen_start_string);           
         assert_eq!(state.position().borrow().0, "rnbqkb1r/pp3ppp/3p1n2/2pPp3/4P3/2N5/PPP2PPP/R1BQKBNR");
         assert_eq!(state.turn, Color::White);
@@ -1279,7 +1322,7 @@ mod tests {
 
     #[test]
     fn load_game_from_fen_castling_partially_available() {
-        let fen_start_string = "rnbq1rk1/p3bppp/2pp1n2/4p1B1/2B1P3/2N5/PPP2PPP/R2QK1NR w KQ - 4 8";
+        let fen_start_string = String::from("rnbq1rk1/p3bppp/2pp1n2/4p1B1/2B1P3/2N5/PPP2PPP/R2QK1NR w KQ - 4 8");
         let state = State::load_game_from_fen(fen_start_string);           
         assert_eq!(state.position().borrow().0, "rnbq1rk1/p3bppp/2pp1n2/4p1B1/2B1P3/2N5/PPP2PPP/R2QK1NR");
         assert_eq!(state.turn, Color::White);
@@ -1294,107 +1337,123 @@ mod tests {
 
     #[test]
     fn is_player_in_check_01() {
-        let state = State::load_game_from_fen("r1b1kb1r/pp1ppppp/1q3n2/8/2BQP3/8/PPP2PPP/RNB1K2R w KQkq - 3 7");
+        let fen_string = String::from("r1b1kb1r/pp1ppppp/1q3n2/8/2BQP3/8/PPP2PPP/RNB1K2R w KQkq - 3 7");
+        let state = State::load_game_from_fen(fen_string);
         assert!(!state.is_player_in_check(&Color::White));
         assert!(!state.is_player_in_check(&Color::Black));
     }
 
     #[test]
     fn is_player_in_check_02() {
-        let state = State::load_game_from_fen("r1b1kb1r/pp1Qpppp/1q3n2/8/2B1P3/8/PPP2PPP/RNB1K2R b KQkq - 0 7");
+        let fen_string = String::from("r1b1kb1r/pp1Qpppp/1q3n2/8/2B1P3/8/PPP2PPP/RNB1K2R b KQkq - 0 7");
+        let state = State::load_game_from_fen(fen_string);
         assert!(!state.is_player_in_check(&Color::White));
         assert!(state.is_player_in_check(&Color::Black));
     }
 
     #[test]
     fn is_player_in_check_03() {
-        let state = State::load_game_from_fen("r3kb1r/pp1bpppp/5n2/6B1/1qB1P3/8/PPP2PPP/RN2K2R w KQkq - 2 9");
+        let fen_string = String::from("r3kb1r/pp1bpppp/5n2/6B1/1qB1P3/8/PPP2PPP/RN2K2R w KQkq - 2 9");
+        let state = State::load_game_from_fen(fen_string);
         assert!(state.is_player_in_check(&Color::White));
         assert!(!state.is_player_in_check(&Color::Black));
     }
 
     #[test]
     fn is_move_legal_pin() {
-        let state = State::load_game_from_fen("r1bqkbnr/ppp2ppp/2np4/1B2p3/4P3/2N2N2/PPPP1PPP/R1BQK2R b KQkq - 1 4");
+        let fen_string = String::from("r1bqkbnr/ppp2ppp/2np4/1B2p3/4P3/2N2N2/PPPP1PPP/R1BQK2R b KQkq - 1 4");
+        let state = State::load_game_from_fen(fen_string);
         let chess_move = Move::new(&Field(5,2), &Field(3,3), state.position_matrix().borrow());
         assert!(!state.is_move_legal(&chess_move));
     }
 
     #[test]
     fn is_move_legal_no_pin() {
-        let state = State::load_game_from_fen("r2qkbnr/pppb1ppp/2np4/1B2p3/4P3/2N2N1P/PPPP1PP1/R1BQK2R b KQkq - 0 5");
+        let fen_string = String::from("r2qkbnr/pppb1ppp/2np4/1B2p3/4P3/2N2N1P/PPPP1PP1/R1BQK2R b KQkq - 0 5");
+        let state = State::load_game_from_fen(fen_string);
         let chess_move = Move::new(&Field(5,2), &Field(3,3), state.position_matrix().borrow());
         assert!(state.is_move_legal(&chess_move));
     }
     
     #[test]
     fn is_move_legal_king_runs_into_check() {
-        let state = State::load_game_from_fen("r2qkbnr/pppb1ppp/3p4/1B2p3/3nP3/2N2N1P/PPPP1PP1/R1BQK2R w KQkq - 1 6");
+        let fen_string = String::from("r2qkbnr/pppb1ppp/3p4/1B2p3/3nP3/2N2N1P/PPPP1PP1/R1BQK2R w KQkq - 1 6");
+        let state = State::load_game_from_fen(fen_string);
         let chess_move = Move::new(&Field(0,4), &Field(1,4), state.position_matrix().borrow());
         assert!(!state.is_move_legal(&chess_move));
     }
     
     #[test]
     fn is_move_legal_king_does_not_run_into_check() {
-        let state = State::load_game_from_fen("r2qkbnr/pppb1ppp/2np4/1B2p3/4P3/2N2N2/PPPP1PPP/R1BQK2R w KQkq - 2 5");
+        let fen_string = String::from("r2qkbnr/pppb1ppp/2np4/1B2p3/4P3/2N2N2/PPPP1PPP/R1BQK2R w KQkq - 2 5");
+        let state = State::load_game_from_fen(fen_string);
         let chess_move = Move::new(&Field(0,4), &Field(1,4), state.position_matrix().borrow());
         assert!(state.is_move_legal(&chess_move));
     }
     
     #[test]
     fn is_players_piece_attacking_field_pawn() {
-        let state = State::load_game_from_fen("rnbqkbnr/ppp1pppp/8/3p4/4P3/8/PPPP1PPP/RNBQKBNR w KQkq d6 0 2");
+        let fen_string = String::from("rnbqkbnr/ppp1pppp/8/3p4/4P3/8/PPPP1PPP/RNBQKBNR w KQkq d6 0 2");
+        let state = State::load_game_from_fen(fen_string);
         assert!(state.is_players_piece_attacking_field(&Color::White, &Field(4,3)));
     }
     
     #[test]
     fn is_players_piece_attacking_field_knight() {
-        let state = State::load_game_from_fen("r1bqkbnr/ppp1pppp/2n5/1B6/8/2N2N2/PPPP1PPP/R1BQK2R b KQkq - 5 5");
+        let fen_string = String::from("r1bqkbnr/ppp1pppp/2n5/1B6/8/2N2N2/PPPP1PPP/R1BQK2R b KQkq - 5 5");
+        let state = State::load_game_from_fen(fen_string);
         assert!(state.is_players_piece_attacking_field(&Color::Black, &Field(3,3)));
     }
     
     #[test]
     fn is_players_piece_attacking_field_bishop() {
-        let state = State::load_game_from_fen("r1bqkb1r/ppp1pppp/2n2n2/1B6/8/2N2N2/PPPP1PPP/R1BQK2R w KQkq - 6 6");
+        let fen_string = String::from("r1bqkb1r/ppp1pppp/2n2n2/1B6/8/2N2N2/PPPP1PPP/R1BQK2R w KQkq - 6 6");
+        let state = State::load_game_from_fen(fen_string);
         assert!(state.is_players_piece_attacking_field(&Color::White, &Field(5,2)));
     }
     
     #[test]
     fn is_players_piece_attacking_field_bishop_blocked() {
-        let state = State::load_game_from_fen("r1bqkb1r/ppp1pppp/2n2n2/1B6/8/2N2N2/PPPP1PPP/R1BQK2R w KQkq - 6 6");
+        let fen_string = String::from("r1bqkb1r/ppp1pppp/2n2n2/1B6/8/2N2N2/PPPP1PPP/R1BQK2R w KQkq - 6 6");
+        let state = State::load_game_from_fen(fen_string);
         assert!(!state.is_players_piece_attacking_field(&Color::White, &Field(7,4)));
     }
     
     #[test]
     fn is_players_piece_attacking_field_rook_blocked() {
-        let state = State::load_game_from_fen("r1bqkb1r/ppp1pppp/2n2n2/1B6/8/2N2N2/PPPP1PPP/R1BQ1RK1 b kq - 7 6");
+        let fen_string = String::from("r1bqkb1r/ppp1pppp/2n2n2/1B6/8/2N2N2/PPPP1PPP/R1BQ1RK1 b kq - 7 6");
+        let state = State::load_game_from_fen(fen_string);
         assert!(!state.is_players_piece_attacking_field(&Color::Black, &Field(1,7)));
     }
     
     #[test]
     fn is_castling_through_check_no_check() {
-        let state = State::load_game_from_fen("r1bqkb1r/ppp1pppp/2n2n2/1B6/8/2N2N2/PPPP1PPP/R1BQK2R w KQkq - 6 6");
+        let fen_string = String::from("r1bqkb1r/ppp1pppp/2n2n2/1B6/8/2N2N2/PPPP1PPP/R1BQK2R w KQkq - 6 6");
+        let state = State::load_game_from_fen(fen_string);
         let chess_move = Move::new(&Field(0,4), &Field(0,6), state.position_matrix().borrow());
         assert!(!state.is_castling_through_check(&chess_move));
     }
     
     #[test]
     fn is_castling_through_check_in_check() {
-        let state = State::load_game_from_fen("r1bqk2r/ppp2ppp/2B1pn2/8/1b6/2N2N2/PPPP1PPP/R1B1QRK1 b kq - 0 8");
+        let fen_string = String::from("r1bqk2r/ppp2ppp/2B1pn2/8/1b6/2N2N2/PPPP1PPP/R1B1QRK1 b kq - 0 8");
+        let state = State::load_game_from_fen(fen_string);
         let chess_move = Move::new(&Field(7,4), &Field(7,6), state.position_matrix().borrow());
         assert!(state.is_castling_through_check(&chess_move));
     }
     
     #[test]
     fn is_castling_through_check_through_check() {
-        let state = State::load_game_from_fen("r2qk2r/p1p2ppp/b1p1pn2/8/8/BPP2N2/P1P2PPP/R3QRK1 b kq - 2 11");
+        let fen_string = String::from("r2qk2r/p1p2ppp/b1p1pn2/8/8/BPP2N2/P1P2PPP/R3QRK1 b kq - 2 11");
+        let state = State::load_game_from_fen(fen_string);
         let chess_move = Move::new(&Field(7,4), &Field(7,6), state.position_matrix().borrow());
         assert!(state.is_castling_through_check(&chess_move));        
     }
 
     #[test]
     fn castle_white_kingside() {
-        let state = State::load_game_from_fen("r1bqk1nr/pppp1ppp/2n5/2b1p3/2B1P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 4 4");
+        let fen_string = String::from("r1bqk1nr/pppp1ppp/2n5/2b1p3/2B1P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 4 4");
+        let state = State::load_game_from_fen(fen_string);
         let chess_move = Move::new(&Field(0,4), &Field(0,6), state.position_matrix().borrow());
         let new_state = state.execute_move(&chess_move);
         new_state.position().borrow_mut().update_from_matrix(new_state.position_matrix().borrow());
@@ -1404,11 +1463,71 @@ mod tests {
     }
     
     #[test]
-    fn castle_white_queenside() {}
+    fn castle_white_queenside() {
+        let fen_string = String::from("rn1qk2r/pppbbppp/5n2/4p3/N2p4/1P1P4/PBPQPPPP/R3KBNR w KQkq - 3 7");
+        let state = State::load_game_from_fen(fen_string);
+        let chess_move = Move::new(&Field(0,4), &Field(0,2), state.position_matrix().borrow());
+        let new_state = state.execute_move(&chess_move);
+        new_state.position().borrow_mut().update_from_matrix(new_state.position_matrix().borrow());
+        assert_eq!(new_state.position().borrow().0, "rn1qk2r/pppbbppp/5n2/4p3/N2p4/1P1P4/PBPQPPPP/2KR1BNR");
+        assert_eq!(new_state.position_matrix().borrow().0[0][2], Piece{color: Color::White, piecetype: PieceType::King});
+        assert_eq!(new_state.position_matrix().borrow().0[0][3], Piece{color: Color::White, piecetype: PieceType::Rook});
+    }
     
     #[test]
-    fn castle_black_kingside() {}
+    fn castle_black_kingside() {
+        let fen_string = String::from("rnbqk2r/pppp1ppp/5n2/2b1p3/2B1P3/5N2/PPPP1PPP/RNBQ1RK1 b kq - 5 4");
+        let state = State::load_game_from_fen(fen_string);
+        let chess_move = Move::new(&Field(7,4), &Field(7,6), state.position_matrix().borrow());
+        let new_state = state.execute_move(&chess_move);
+        new_state.position().borrow_mut().update_from_matrix(new_state.position_matrix().borrow());
+        assert_eq!(new_state.position().borrow().0, "rnbq1rk1/pppp1ppp/5n2/2b1p3/2B1P3/5N2/PPPP1PPP/RNBQ1RK1");
+        assert_eq!(new_state.position_matrix().borrow().0[7][5], Piece{color: Color::Black, piecetype: PieceType::Rook});
+        assert_eq!(new_state.position_matrix().borrow().0[7][6], Piece{color: Color::Black, piecetype: PieceType::King});
+    }
 
     #[test]
-    fn castle_black_queenside() {}
+    fn castle_black_queenside() {
+        let fen_string = String::from("r3kbnr/pbpqpppp/1pnp4/8/2B1P3/2NP1N2/PPP2PPP/R1BQ1RK1 b kq - 0 6");
+        let state = State::load_game_from_fen(fen_string);
+        let chess_move = Move::new(&Field(7,4), &Field(7,2), state.position_matrix().borrow());
+        let new_state = state.execute_move(&chess_move);
+        new_state.position().borrow_mut().update_from_matrix(new_state.position_matrix().borrow());
+        assert_eq!(new_state.position().borrow().0, "2kr1bnr/pbpqpppp/1pnp4/8/2B1P3/2NP1N2/PPP2PPP/R1BQ1RK1");
+        assert_eq!(new_state.position_matrix().borrow().0[7][2], Piece{color: Color::Black, piecetype: PieceType::King});
+        assert_eq!(new_state.position_matrix().borrow().0[7][3], Piece{color: Color::Black, piecetype: PieceType::Rook});
+    }
+
+    #[test]
+    fn en_passant_white() {
+        let fen_string = String::from("rnbqkbnr/ppp1p1pp/8/3pPp2/8/8/PPPP1PPP/RNBQKBNR w KQkq f6 0 3");
+        let state = State::load_game_from_fen(fen_string);
+
+        // the left pawn moved the move before
+        // en passant is only possible on f6
+        let chess_move = Move::new(&Field(4,4), &Field(5,3), state.position_matrix().borrow());
+        assert!(!state.is_move_legal(&chess_move));
+        let chess_move = Move::new(&Field(4,4), &Field(5,5), state.position_matrix().borrow());
+        assert!(state.is_move_legal(&chess_move));
+
+        // check whether the en passant move execution works
+        let new_state = state.execute_move(&chess_move);
+        new_state.position().borrow_mut().update_from_matrix(new_state.position_matrix().borrow());
+        assert_eq!(new_state.position_matrix().borrow().0[5][5], Piece{color: Color::White, piecetype: PieceType::Pawn});
+        assert_eq!(new_state.position_matrix().borrow().0[4][5], Piece{color: Color::None, piecetype: PieceType::None});    
+        assert_eq!(new_state.position().borrow().0, "rnbqkbnr/ppp1p1pp/5P2/3p4/8/8/PPPP1PPP/RNBQKBNR");
+    }
+
+    #[test]
+    fn en_passant_black() {
+        let fen_string = String::from("rnbq1rk1/1p1pppbp/5np1/2p5/pPB1P3/2NP1N2/P1PB1PPP/R2Q1RK1 b - b3 0 8");
+        let state = State::load_game_from_fen(fen_string);
+        let chess_move = Move::new(&Field(3,0), &Field(2,1), state.position_matrix().borrow());
+        assert!(state.is_move_legal(&chess_move));
+        let new_state = state.execute_move(&chess_move);
+        new_state.position().borrow_mut().update_from_matrix(new_state.position_matrix().borrow());
+        assert_eq!(new_state.position_matrix().borrow().0[2][1], Piece{color: Color::Black, piecetype: PieceType::Pawn});
+        assert_eq!(new_state.position_matrix().borrow().0[3][1], Piece{color: Color::None, piecetype: PieceType::None});    
+        assert_eq!(new_state.position().borrow().0, "rnbq1rk1/1p1pppbp/5np1/2p5/2B1P3/1pNP1N2/P1PB1PPP/R2Q1RK1");
+    }
 }
