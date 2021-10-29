@@ -1,4 +1,6 @@
 # DOING
+- Implement stalemate
+- Checkmate is stalemate + check
 
 # TODO
 - [ ] Checkmate and stalemate
@@ -16,6 +18,7 @@
 
 # BACKLOG
 * Add some licence
+* Some special cases (e.g., castling not allowed when king moved)
 * AI making legal moves
 * Don't panic on illegal moves!
 * Graceful exit

@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 use std::io;
 use std::cmp::PartialEq;
 use std::cmp::max;
@@ -351,8 +350,56 @@ impl<'a> State {
         &self.turn
     }
     
+    pub fn turn_rev(&self) -> &Color {
+        match self.turn {
+            Color::White => &Color::Black,
+            Color::Black => &Color::White,
+            _ => panic!("Invalid game state turn 'None'. State: {:?}", self) 
+        }
+    }
+
+    fn player_has_legal_move(&self) -> bool {
+        println!("'player_has_legal_move' not implemented yet!");
+        // iterate through the whole field and try to move each of the players piece
+        // if one piece can move, return true
+        /*
+        for (i, rank) in self.position_matrix().borrow().0.iter().enumerate() {
+            for (j, piece) in rank.iter().enumerate() {
+                
+                if piece.color() != self.turn() {
+                    continue;
+                } 
+
+                // how do we know where the piece can move?
+                let chess_move = match piece.piecetype() {
+                    // check the possible moves for each type
+                    // this is kinda duplicate to the legal move checking
+                    // there should be a way to generalize this!
+                }
+                let chess_move = Move::new(&Field(i,j), field, self.position_matrix().borrow());   
+                
+                if self.is_move_legal(&chess_move) { 
+                    return true;
+                }
+            }
+        }
+        false
+        */
+        true
+    }
+    
+
     pub fn next_move(game: &mut LinkedList<State>) {
-               
+        
+        if !game.back().unwrap().player_has_legal_move() {
+            if game.back().unwrap().is_player_in_check(&Color::None) {
+                println!("STALEMATE!");
+            } else {
+                println!("CHECKMATE! {:?} won!", game.back().unwrap().turn_rev());
+            }
+            return
+        }        
+
         // get the player input
         let mut move_string = String::new();
         io::stdin().read_line(&mut move_string).unwrap();
@@ -672,14 +719,6 @@ impl<'a> State {
         // - Fullclock move number
     }
 
-    fn revert_move(game: &mut LinkedList<State>) {
-        game.pop_back();
-    }
-
-    fn is_piece_on_field(&self, field: &Field) -> bool {
-        self.position_matrix().borrow().has_piece_on_field(field)
-    }
-
     fn toggle_turn(&mut self) {
         if self.turn == Color::White {
             self.turn = Color::Black;
@@ -704,7 +743,13 @@ impl<'a> State {
         let enemy_color: Color = match player {
             &Color::White => Color::Black,
             &Color::Black => Color::White,
-            _ => panic!("No valid player color requested!")
+
+            // if no color is provided, use the current player
+            &Color::None => match self.turn() {
+                &Color::White => Color::Black,
+                &Color::Black => Color::White,
+                &Color::None => panic!("Corrupt game state, no turn. State: {:?}", self)
+            }
         };
 
         let king_field: Field = State::get_king_field(self.position_matrix().borrow(), player).unwrap();
@@ -757,11 +802,11 @@ mod tests {
     }
 
     #[test]
-    fn matrix_empty_field() {
+    fn matrix_take_piece() {
         let state = State::new(None);
-        assert!(state.is_piece_on_field(&Field(0,0)));
+        assert!(state.position_matrix().borrow().0[0][0] != Piece{color: Color::None, piecetype: PieceType::None});
         state.position_matrix().borrow_mut().take_piece(&Field(0,0));
-        assert!(!state.is_piece_on_field(&Field(0,0)));
+        assert!(state.position_matrix().borrow().0[0][0] == Piece{color: Color::None, piecetype: PieceType::None});
     }
 
     #[test]
@@ -819,7 +864,6 @@ mod tests {
         next_state.position().borrow_mut().update_from_matrix(next_state.position_matrix().borrow());
         assert_eq!(next_state.position().borrow().0, "r1bqkbnr/pppppppp/2n5/8/4P3/8/PPPP1PPP/RNBQKBNR");
     }
-    
 
     #[test]
     fn is_move_legal() {
