@@ -1,9 +1,8 @@
 # DOING
-- Implement stalemate
-- Checkmate is stalemate + check
+- move the clocks
 
 # TODO
-- [ ] Checkmate and stalemate
+- [x] Checkmate and stalemate
 - [x] Implement en-passant and castling in the move execution
 - [x] Assert that the king doesn't move through check when castling
 - [x] Assert that the move will not result in the player being in check
@@ -18,9 +17,8 @@
 
 # BACKLOG
 * Add some licence
-* Some special cases (e.g., castling not allowed when king moved)
-* AI making legal moves
 * Don't panic on illegal moves!
+* AI making legal moves
 * Graceful exit
 * Save / export (FEN) positions
 * OpenGL support

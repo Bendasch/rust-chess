@@ -2,6 +2,7 @@ use crate::library::game::*;
 use std::fmt;
 use std::cell::*;
 use std::collections::LinkedList;
+use std::io;
 
 // somehow the black ascii chess pieces look like white and vice versa...
 // depending on the console, they made need to be swapped (again)
@@ -23,9 +24,24 @@ pub fn run(fen: Option<String>) {
     let mut game: LinkedList<State> = LinkedList::new();
     game.push_back(State::new(fen));
     loop {
-        draw_board(game.back().unwrap().position().borrow());
-        draw_who_to_move(game.back().unwrap().turn());
-        State::next_move(&mut game);
+
+        draw_board(game.back().unwrap().position().borrow());        
+
+        // who to move?
+        match game.back().unwrap().check_game_over() {
+            
+            GameOver::BlackWon => {println!("Checkmate, black won!"); return},
+            GameOver::WhiteWon => {println!("Checkmate, white won!"); return}, 
+            GameOver::Stalemate => {println!("Stalemate!"); return},
+
+            _ => draw_who_to_move(game.back().unwrap().turn())
+        }
+        
+        // get input from player
+        let mut move_string = String::new();
+        io::stdin().read_line(&mut move_string).unwrap();
+        
+        State::perform_turn_from_input(move_string, &mut game);
     }
 }
 

@@ -1,9 +1,16 @@
-use std::io;
 use std::cmp::PartialEq;
 use std::cmp::max;
 use std::cell::RefCell;
 use std::cell::Ref;
 use std::collections::LinkedList;
+
+
+pub enum GameOver {
+    No, 
+    WhiteWon,
+    BlackWon,
+    Stalemate
+}
 
 #[derive(PartialEq, Copy, Clone, Debug)]
 pub enum Color {
@@ -359,53 +366,62 @@ impl<'a> State {
     }
 
     fn player_has_legal_move(&self) -> bool {
-        println!("'player_has_legal_move' not implemented yet!");
+
         // iterate through the whole field and try to move each of the players piece
         // if one piece can move, return true
-        /*
+
         for (i, rank) in self.position_matrix().borrow().0.iter().enumerate() {
             for (j, piece) in rank.iter().enumerate() {
                 
+                // ignore empty fields and enemy pieces
                 if piece.color() != self.turn() {
                     continue;
                 } 
 
-                // how do we know where the piece can move?
-                let chess_move = match piece.piecetype() {
-                    // check the possible moves for each type
-                    // this is kinda duplicate to the legal move checking
-                    // there should be a way to generalize this!
-                }
-                let chess_move = Move::new(&Field(i,j), field, self.position_matrix().borrow());   
-                
-                if self.is_move_legal(&chess_move) { 
-                    return true;
+                // check each target field for legal moves
+                for (k, rank) in self.position_matrix().borrow().0.iter().enumerate() {
+                    for (l, piece) in rank.iter().enumerate() {
+                        
+                        // if the player already has a piece on this field
+                        // we can discount it
+                        if piece.color() == self.turn() {
+                            continue;
+                        }                        
+                        
+                        let chess_move = Move::new(&Field(i,j), &Field(k,l), self.position_matrix().borrow());   
+                        
+                        if self.is_move_legal(&chess_move) { 
+                            return true;
+                        }                        
+                    }
                 }
             }
         }
+
         false
-        */
-        true
     }
     
-
-    pub fn next_move(game: &mut LinkedList<State>) {
+    pub fn check_game_over(&self) -> GameOver {
         
-        if !game.back().unwrap().player_has_legal_move() {
-            if game.back().unwrap().is_player_in_check(&Color::None) {
-                println!("STALEMATE!");
-            } else {
-                println!("CHECKMATE! {:?} won!", game.back().unwrap().turn_rev());
-            }
-            return
-        }        
-
-        // get the player input
-        let mut move_string = String::new();
-        io::stdin().read_line(&mut move_string).unwrap();
+        if self.player_has_legal_move() {
+            return GameOver::No;
+        }
         
+        if !self.is_player_in_check(&Color::None) {
+            return GameOver::Stalemate;
+        }
+
+        if self.turn() == &Color::White {
+            return GameOver::BlackWon
+        } else {
+            return GameOver::WhiteWon
+        }            
+    }
+
+    pub fn perform_turn_from_input(player_input: String, game: &mut LinkedList<State>) {
+
         // transform to vector of characters and strip newlines or carriage returns
-        let move_indices: Vec<usize> = move_string.chars().filter(
+        let move_indices: Vec<usize> = player_input.chars().filter(
             |c| *c != '\n' && *c != '\r'
         ).map(
             |c| c.to_digit(10).expect("Faulty move string") as usize
@@ -624,7 +640,6 @@ impl<'a> State {
 
                 let chess_move = Move::new(&Field(i,j), field, self.position_matrix().borrow());   
                 if State::piece_can_reach_target_field(&self, &chess_move) && State::piece_has_path_to_target_field(&self, &chess_move) { 
-                    println!("{:?} is attacking field {:?} (move: {:?}", piece, field, chess_move);
                     return true;
                 }
             }
@@ -710,13 +725,72 @@ impl<'a> State {
         // 4) Change the turn
         new_state.toggle_turn();
         
-        new_state
+        // Castleing availability 
+        new_state.update_castling_availability(chess_move);
 
-        // TODO: adjust all other things:
-        // - Castling availability
-        // - En passant availability
-        // - Halfclock move number
-        // - Fullclock move number
+        // En passant availability
+        new_state.update_en_passant(chess_move);
+        
+        // Halfclock move number
+        
+        // Fullclock move number
+
+        new_state
+    }
+
+    fn update_en_passant(&mut self, chess_move: &Move) {
+        if chess_move.piece().piecetype() != &PieceType::Pawn {
+            self.en_passant = None;
+            return;  
+        }
+        
+        if chess_move.rank_distance() < 2 {
+            self.en_passant = None;
+            return;
+        }
+
+        // the en passant field is the field between the pawns starting and target field 
+        let en_passant_field: Field = match self.turn() {
+            &Color::White => Field(chess_move.start_field().0 + 1, chess_move.start_field().1),
+            &Color::Black => Field(chess_move.start_field().0 - 1, chess_move.start_field().1),
+            _ => panic!("Invalid game state, no turn. {:?}", self)
+        };
+        self.en_passant = Some(en_passant_field);
+    }
+
+    fn update_castling_availability(&mut self, chess_move: &Move) {
+        if chess_move.piece().piecetype() != &PieceType::Rook && chess_move.piece().piecetype() != &PieceType::King {
+            return; // nothing to do here
+        }
+
+        if chess_move.piece().piecetype() == &PieceType::King {
+            if self.turn() == &Color::Black {
+                self.castle_availability.black_king = false;
+                self.castle_availability.black_queen = false;
+            } else {
+                self.castle_availability.white_king = false;
+                self.castle_availability.white_queen = false;
+            }
+            return;
+        }
+        
+        if chess_move.start_field().1 == 0 {
+            if self.turn() == &Color::Black {
+                self.castle_availability.black_queen = false;
+            } else {
+                self.castle_availability.white_queen = false;
+            }
+            return;
+        } 
+
+        if chess_move.start_field().1 == 7 {
+            if self.turn() == &Color::Black {
+                self.castle_availability.black_king = false;
+            } else {
+                self.castle_availability.white_king = false;
+            }
+            return;
+        } 
     }
 
     fn toggle_turn(&mut self) {
@@ -738,21 +812,20 @@ impl<'a> State {
         None
     }
 
-    fn is_player_in_check(&self, player: &Color) -> bool {
+    fn is_player_in_check(&self, color: &Color) -> bool {
 
-        let enemy_color: Color = match player {
-            &Color::White => Color::Black,
-            &Color::Black => Color::White,
-
-            // if no color is provided, use the current player
-            &Color::None => match self.turn() {
-                &Color::White => Color::Black,
-                &Color::Black => Color::White,
-                &Color::None => panic!("Corrupt game state, no turn. State: {:?}", self)
-            }
+        let player_color = match color {
+            &Color::None => self.turn(),
+            _ => color
         };
 
-        let king_field: Field = State::get_king_field(self.position_matrix().borrow(), player).unwrap();
+        let enemy_color: Color = match player_color {
+            &Color::White => Color::Black,
+            &Color::Black => Color::White,
+            &Color::None => panic!("Corrupt game state, no turn. State: {:?}", self)
+        };
+
+        let king_field: Field = State::get_king_field(self.position_matrix().borrow(), player_color).unwrap();
         
         self.is_players_piece_attacking_field(&enemy_color, &king_field)
     }
@@ -1574,4 +1647,130 @@ mod tests {
         assert_eq!(new_state.position_matrix().borrow().0[3][1], Piece{color: Color::None, piecetype: PieceType::None});    
         assert_eq!(new_state.position().borrow().0, "rnbq1rk1/1p1pppbp/5np1/2p5/2B1P3/1pNP1N2/P1PB1PPP/R2Q1RK1");
     }
+
+    #[test]
+    fn player_has_legal_move_yes() {
+        let fen_string = String::from("rnbq1rk1/1p1pppbp/5np1/2p5/pPB1P3/2NP1N2/P1PB1PPP/R2Q1RK1 b - b3 0 8");
+        let state = State::load_game_from_fen(fen_string);
+        assert!(state.player_has_legal_move());
+    }
+
+    #[test]
+    fn player_has_legal_move_stalemate() {
+        let fen_string = String::from("1Q6/8/8/8/3K4/8/p7/k7 b - - 0 1");
+        let state = State::load_game_from_fen(fen_string);
+        assert!(!state.player_has_legal_move());
+    }
+    
+    #[test]
+    fn player_has_legal_move_checkmate() {
+        let fen_string = String::from("8/8/4kB1P/PP1p3R/6N1/8/1r6/2r3K1 w - - 0 1");
+        let state = State::load_game_from_fen(fen_string);
+        assert!(!state.player_has_legal_move());
+    }
+
+    #[test]
+    fn castle_availability_white_king() {
+        let fen_string = String::from("r1bq1rk1/pp1pppbp/2n2np1/2p5/2B1P3/1P3N2/PBPPQPPP/RN2K2R w KQ - 3 7");
+        let mut state = State::load_game_from_fen(fen_string);
+        let chess_move = Move::new(&Field(0,7), &Field(0,6), state.position_matrix().borrow());
+        state.update_castling_availability(&chess_move);
+        assert!(!state.castle_availability.white_king);
+        assert!(state.castle_availability.white_queen);
+        assert!(!state.castle_availability.black_king);
+        assert!(!state.castle_availability.black_queen);
+    }
+    
+    #[test]
+    fn castle_availability_white_queen() {
+        let fen_string = String::from("r1b2rk1/pp1pppbp/1qn2np1/2p5/2B1P3/1PN2N2/PBPPQPPP/R3K2R w KQ - 5 8");
+        let mut state = State::load_game_from_fen(fen_string);
+        let chess_move = Move::new(&Field(0,0), &Field(0,1), state.position_matrix().borrow());
+        state.update_castling_availability(&chess_move);
+        assert!(state.castle_availability.white_king);
+        assert!(!state.castle_availability.white_queen);
+        assert!(!state.castle_availability.black_king);
+        assert!(!state.castle_availability.black_queen);
+    }
+    
+    #[test]
+    fn castle_availability_white_both() {        
+        let fen_string = String::from("rnbqk1nr/pppp1ppp/8/2b1p3/2B1P3/8/PPPP1PPP/RNBQK1NR w KQkq - 2 3");
+        let mut state = State::load_game_from_fen(fen_string);
+        let chess_move = Move::new(&Field(0,4), &Field(1,4), state.position_matrix().borrow());
+        state.update_castling_availability(&chess_move);
+        assert!(!state.castle_availability.white_king);
+        assert!(!state.castle_availability.white_queen);
+        assert!(state.castle_availability.black_king);
+        assert!(state.castle_availability.black_queen);
+    }
+
+    #[test]
+    fn castle_availability_black_king() {
+        let fen_string = String::from("rnbqk2r/pppp1ppp/5n2/2b1p3/2B1P3/5N2/PPPP1PPP/RNBQ1RK1 b kq - 5 4");
+        let mut state = State::load_game_from_fen(fen_string);
+        let chess_move = Move::new(&Field(7,7), &Field(7,5), state.position_matrix().borrow());
+        state.update_castling_availability(&chess_move);
+        assert!(!state.castle_availability.white_king);
+        assert!(!state.castle_availability.white_queen);
+        assert!(!state.castle_availability.black_king);
+        assert!(state.castle_availability.black_queen);
+    }
+    
+    #[test]
+    fn castle_availability_black_queen() {
+        let fen_string = String::from("r3kbnr/pbqppppp/1pn5/2p5/2B1P3/2NP1N2/PPP2PPP/R1BQ1RK1 b kq - 0 6");
+        let mut state = State::load_game_from_fen(fen_string);
+        let chess_move = Move::new(&Field(7,0), &Field(7,1), state.position_matrix().borrow());
+        state.update_castling_availability(&chess_move);
+        assert!(!state.castle_availability.white_king);
+        assert!(!state.castle_availability.white_queen);
+        assert!(state.castle_availability.black_king);
+        assert!(!state.castle_availability.black_queen);
+    }
+    
+    #[test]
+    fn castle_availability_black_both() {
+        let fen_string = String::from("r3kbnr/pbqppppp/1pn5/2p5/2B1P3/2NP1N2/PPP2PPP/R1BQ1RK1 b kq - 0 6");
+        let mut state = State::load_game_from_fen(fen_string);
+        let chess_move = Move::new(&Field(7,4), &Field(7,3), state.position_matrix().borrow());
+        state.update_castling_availability(&chess_move);
+        assert!(!state.castle_availability.white_king);
+        assert!(!state.castle_availability.white_queen);
+        assert!(!state.castle_availability.black_king);
+        assert!(!state.castle_availability.black_queen);
+    }
+    
+    #[test]
+    fn update_en_passant_white() {
+        let fen_string = String::from("r1b2rk1/pp2ppb1/1qnp1npp/2p5/2B1P3/2N1QN2/PPPP1PPP/R1BR3K w - - 4 10");
+        let mut state = State::load_game_from_fen(fen_string);
+        let chess_move = Move::new(&Field(1,3), &Field(3,3), state.position_matrix().borrow());
+        state.update_en_passant(&chess_move);
+        assert_eq!(state.en_passant, Some(Field(2,3)));
+    }
+        
+    #[test]
+    fn update_en_passant_black() {
+        let fen_string = String::from("rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1");
+        let mut state = State::load_game_from_fen(fen_string);
+        let chess_move = Move::new(&Field(6,2), &Field(4,2), state.position_matrix().borrow());
+        state.update_en_passant(&chess_move);
+        assert_eq!(state.en_passant, Some(Field(5,2)));
+    }   
+
+    #[test]
+    fn update_en_passant_none() {
+        let fen_string = String::from("r1b2rk1/pp2ppb1/1qnp1npp/2p5/2BPP3/2N1QN2/PPP2PPP/R1BR3K b - d3 0 10");
+        let mut state = State::load_game_from_fen(fen_string);
+        let chess_move = Move::new(&Field(7,2), &Field(3,6), state.position_matrix().borrow());
+        state.update_en_passant(&chess_move);
+        assert_eq!(state.en_passant, None);
+    }
+
+    // M1
+    // 8/8/4kB1P/PP1p3R/6N1/2r5/1r6/6K1 b - - 0 1
+
+    // Stalemate 1
+    // 8/2Q5/8/8/3K4/8/p7/k7 w - - 0 1
 }
