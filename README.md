@@ -1,7 +1,15 @@
 # DOING
-- move the clocks
+* Add some licence
+* Don't panic on illegal moves!
+* Graceful exit
 
-# TODO
+# BACKLOG
+* OpenGL support
+* AI making legal moves
+* Save / export (FEN) positions
+* Vulkan support
+
+# Done
 - [x] Checkmate and stalemate
 - [x] Implement en-passant and castling in the move execution
 - [x] Assert that the king doesn't move through check when castling
@@ -14,12 +22,3 @@
 - [x] Assert that the way to the target field is not blocked
 - [x] Assert that the selected piece can in principle reach the target field
 - [x] Assert that a proper piece was selected (no empty field, right color)
-
-# BACKLOG
-* Add some licence
-* Don't panic on illegal moves!
-* AI making legal moves
-* Graceful exit
-* Save / export (FEN) positions
-* OpenGL support
-* Vulkan support

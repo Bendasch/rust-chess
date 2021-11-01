@@ -205,8 +205,10 @@ impl PositionMatrix {
         piece
     }
 
-    fn place_piece(&mut self, piece: Piece, field: &Field) {
+    fn place_piece(&mut self, piece: Piece, field: &Field) -> Piece {
+        let current_piece: Piece = self.0[field.0][field.1];
         self.0[field.0][field.1] = piece;
+        current_piece
     }
 }
 
@@ -710,31 +712,30 @@ impl<'a> State {
         
         let mut new_state = self.clone();
 
-        // 1) remove the piece from it's current field
         new_state.position_matrix().borrow_mut().take_piece(&chess_move.start_field);
     
-        // 2) replace the new field with the piece
-        new_state.position_matrix().borrow_mut().place_piece(chess_move.piece, &chess_move.target_field);
+        let taken_piece: Piece = new_state.position_matrix().borrow_mut().place_piece(chess_move.piece, &chess_move.target_field);
 
-        // 3.1) handle castling
         new_state.move_rook_when_castling(chess_move);
         
-        // 3.2) handle en-passant
         new_state.remove_enemy_pawn_en_passant(chess_move);
-
-        // 4) Change the turn
-        new_state.toggle_turn();
         
-        // Castleing availability 
         new_state.update_castling_availability(chess_move);
-
-        // En passant availability
+        
         new_state.update_en_passant(chess_move);
         
-        // Halfclock move number
+        if taken_piece.piecetype() != &PieceType::None || chess_move.piece().piecetype() == &PieceType::Pawn {
+            new_state.halfmove_clock = 0;
+        } else {
+            new_state.halfmove_clock += 1;
+        }
         
-        // Fullclock move number
-
+        if new_state.turn() == &Color::Black {
+            new_state.fullmove_clock += 1;
+        }
+        
+        new_state.toggle_turn();
+        
         new_state
     }
 
@@ -1766,6 +1767,54 @@ mod tests {
         let chess_move = Move::new(&Field(7,2), &Field(3,6), state.position_matrix().borrow());
         state.update_en_passant(&chess_move);
         assert_eq!(state.en_passant, None);
+    }
+
+    #[test]
+    fn update_fullmove() {
+        let fen_string = String::from("r1bqk2r/pp1pnpbp/2n1p1p1/8/2BPP3/5N2/PP3PPP/RNBQ1RK1 w kq - 1 8");
+        let mut state = State::load_game_from_fen(fen_string);
+        assert_eq!(state.fullmove_clock, 8);
+        let chess_move = Move::new(&Field(0,1), &Field(2,2), state.position_matrix().borrow());
+        state = state.execute_move(&chess_move);
+        state.position().borrow_mut().update_from_matrix(state.position_matrix().borrow());
+        assert_eq!(state.fullmove_clock, 8);
+        let chess_move = Move::new(&Field(7,4), &Field(7,6), state.position_matrix().borrow());
+        state = state.execute_move(&chess_move);
+        state.position().borrow_mut().update_from_matrix(state.position_matrix().borrow());
+        assert_eq!(state.fullmove_clock, 9);
+    }
+
+    #[test]
+    fn update_halfmove_add() {
+        let fen_string = String::from("r1bq1rk1/pp1pnpbp/2n1p1p1/8/2BPP3/2N2N2/PP3PPP/R1BQ1RK1 w - - 3 9");
+        let mut state = State::load_game_from_fen(fen_string);
+        assert_eq!(state.halfmove_clock, 3);
+        let chess_move = Move::new(&Field(0,2), &Field(4,6), state.position_matrix().borrow());
+        state = state.execute_move(&chess_move);
+        state.position().borrow_mut().update_from_matrix(state.position_matrix().borrow());
+        assert_eq!(state.halfmove_clock, 4);
+    }
+
+    #[test]
+    fn update_fullmove_reset_pawn() {
+        let fen_string = String::from("r1bq1rk1/pp1pnpbp/2n1p1p1/6B1/2BPP3/2N2N2/PP3PPP/R2Q1RK1 b - - 4 9");
+        let mut state = State::load_game_from_fen(fen_string);
+        assert_eq!(state.halfmove_clock, 4);
+        let chess_move = Move::new(&Field(6,0), &Field(5,0), state.position_matrix().borrow());
+        state = state.execute_move(&chess_move);
+        state.position().borrow_mut().update_from_matrix(state.position_matrix().borrow());
+        assert_eq!(state.halfmove_clock, 0);
+    }
+
+    #[test]
+    fn update_fullmove_reset_capture() {
+        let fen_string = String::from("r1bqr1k1/3pnpbp/p1n1p1p1/1p4B1/3PP3/P1N2N2/BP3PPP/R2Q1RK1 w - - 2 12");
+        let mut state = State::load_game_from_fen(fen_string);
+        assert_eq!(state.halfmove_clock, 2);
+        let chess_move = Move::new(&Field(4,6), &Field(6,4), state.position_matrix().borrow());
+        state = state.execute_move(&chess_move);
+        state.position().borrow_mut().update_from_matrix(state.position_matrix().borrow());
+        assert_eq!(state.halfmove_clock, 0);
     }
 
     // M1
