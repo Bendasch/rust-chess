@@ -10,6 +10,7 @@
 * Vulkan support
 
 # Done
+- [x] Castle availability, en-passant fields and clock counts
 - [x] Checkmate and stalemate
 - [x] Implement en-passant and castling in the move execution
 - [x] Assert that the king doesn't move through check when castling
