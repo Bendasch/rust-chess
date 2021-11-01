@@ -1,15 +1,15 @@
 # DOING
-* Add some licence
-* Don't panic on illegal moves!
-* Graceful exit
+* OpenGL support
 
 # BACKLOG
-* OpenGL support
+* Error propagation to frontend
 * AI making legal moves
+* Add how to play
 * Save / export (FEN) positions
 * Vulkan support
 
 # Done
+- [x] Added MIT license
 - [x] Castle availability, en-passant fields and clock counts
 - [x] Checkmate and stalemate
 - [x] Implement en-passant and castling in the move execution
