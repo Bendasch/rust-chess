@@ -3,8 +3,8 @@ use std::error::Error;
 use std::process;
 
 use rust_chess::library::config::*;
-use rust_chess::library::cli_chess;
-use rust_chess::library::bevy_chess;
+use rust_chess::library::cli;
+use rust_chess::library::opengl;
 
 fn main() {
     let config = Config::new(env::args()).unwrap_or_else(|err| {
@@ -22,8 +22,8 @@ fn main() {
 
 fn run(config: Config) -> Result<(),Box<dyn Error>> {
     match config.gui_type {
-        GuiType::CLI => cli_chess::run(config.fen), 
-        GuiType::Bevy => bevy_chess::run()
+        GuiType::CLI => cli::run(config.fen), 
+        GuiType::OPENGL => opengl::run()
     }
     Ok(())
 }

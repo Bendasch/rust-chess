@@ -3,14 +3,14 @@ use std::fmt;
 
 pub enum GuiType {
     CLI,
-    Bevy
+    OPENGL
 }
 
 impl fmt::Display for GuiType {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             GuiType::CLI => write!(f, "command line"),
-            GuiType::Bevy => write!(f, "Bevy")
+            GuiType::OPENGL => write!(f, "OpenGL")
         } 
     }    
 }
@@ -26,7 +26,7 @@ impl Config {
 
         let gui_type = match args.next() {
             Some(arg) if arg == "cli" => GuiType::CLI,
-            Some(arg) if arg == "bevy" => GuiType::Bevy,
+            Some(arg) if arg == "opengl" => GuiType::OPENGL,
             Some(_) => return Err("Please enter a valid GUI type (cli / bevy)."), 
             None => return Err("Please enter a valid GUI type (cli / bevy).")
         };
