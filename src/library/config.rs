@@ -1,21 +1,21 @@
 use std::env;
 use std::fmt;
 
-pub enum GuiType {
+pub enum UiType {
     CLI,
-    OPENGL
+    GUI
 }
 
-impl fmt::Display for GuiType {
+impl fmt::Display for UiType {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            GuiType::CLI => write!(f, "command line"),
-            GuiType::OPENGL => write!(f, "OpenGL")
+            UiType::CLI => write!(f, "command line"),
+            UiType::GUI => write!(f, "graphical interface (OpenGL)")
         } 
     }    
 }
 pub struct Config {
-    pub gui_type: GuiType,
+    pub ui_type: UiType,
     pub fen: Option<String>
 }
 
@@ -24,15 +24,15 @@ impl Config {
 
         args.next(); // skip the program name
 
-        let gui_type = match args.next() {
-            Some(arg) if arg == "cli" => GuiType::CLI,
-            Some(arg) if arg == "opengl" => GuiType::OPENGL,
-            Some(_) => return Err("Please enter a valid GUI type (cli / bevy)."), 
-            None => return Err("Please enter a valid GUI type (cli / bevy).")
+        let ui_type = match args.next() {
+            Some(arg) if arg == "cli" => UiType::CLI,
+            Some(arg) if arg == "gui" => UiType::GUI,
+            Some(_) => return Err("Please enter a valid UI type (cli / gui)."), 
+            None => return Err("Please enter a valid UI type (cli / gui).")
         };
 
         let fen = args.next();
 
-        Ok(Config { gui_type, fen })
+        Ok(Config { ui_type, fen })
     }
 }

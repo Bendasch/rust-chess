@@ -4,7 +4,7 @@ use std::process;
 
 use rust_chess::library::config::*;
 use rust_chess::library::cli;
-use rust_chess::library::opengl;
+use rust_chess::library::gui;
 
 fn main() {
     let config = Config::new(env::args()).unwrap_or_else(|err| {
@@ -12,7 +12,7 @@ fn main() {
         process::exit(1);
     });
     
-    println!("Running the {} version...", config.gui_type);
+    println!("Running the {} version...", config.ui_type);
     
     if let Err(e) = run(config) {
         eprintln!("Application error: {}", e);
@@ -21,9 +21,9 @@ fn main() {
 }
 
 fn run(config: Config) -> Result<(),Box<dyn Error>> {
-    match config.gui_type {
-        GuiType::CLI => cli::run(config.fen), 
-        GuiType::OPENGL => opengl::run()
+    match config.ui_type {
+        UiType::CLI => cli::run(config.fen), 
+        UiType::GUI => gui::run()
     }
     Ok(())
 }
