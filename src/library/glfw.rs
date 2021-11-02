@@ -11,8 +11,9 @@ pub enum GLFWwindow {}
 extern "C" {
     pub fn glfwInit() -> c_int;
     pub fn glfwCreateWindow(width: c_int, height: c_int, title: *const c_char, monitor: *mut GLFWmonitor, share: *mut GLFWwindow) -> *mut GLFWwindow;
-    pub fn glfwTerminate();
     pub fn glfwMakeContextCurrent(window: *mut GLFWwindow);
     pub fn glfwWindowShouldClose(window: *mut GLFWwindow) -> c_int;
+    pub fn glfwSwapBuffers(window: *mut GLFWwindow);
     pub fn glfwPollEvents();
+    pub fn glfwTerminate();
 }
