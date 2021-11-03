@@ -7,7 +7,7 @@ pub enum GLFWmonitor {}
 pub enum GLFWwindow {}
 
 
-#[link(name = "glfw3dll")]
+#[link(name = "glfw3dll", kind="static")]
 extern "C" {
     pub fn glfwInit() -> c_int;
     pub fn glfwCreateWindow(width: c_int, height: c_int, title: *const c_char, monitor: *mut GLFWmonitor, share: *mut GLFWwindow) -> *mut GLFWwindow;
