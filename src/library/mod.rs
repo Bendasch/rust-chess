@@ -3,5 +3,5 @@ pub mod game;
 pub mod cli;
 pub mod gui;
 pub mod glfw;
-pub mod glew;
-pub mod opengl;
+pub mod legacy_opengl;
+pub mod modern_opengl;
