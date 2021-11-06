@@ -60,4 +60,5 @@ extern "C" {
     pub fn glVertex2f(x: GLfloat, y: GLfloat); 
     pub fn glGetIntegerv(pname: GLenum, data: *mut GLint);
     pub fn glGetString(name: GLenum) -> *const GLubyte;
+    pub fn glDrawArrays(mode: GLenum, first: GLint, count: GLsizei);
 }

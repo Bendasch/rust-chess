@@ -9,6 +9,7 @@ use crate::library::legacy_opengl::*;
 #[link(name = "Opengl32")]
 extern "C" {
     pub fn wglGetProcAddress(unnamedParam1: *const c_char) -> *const ();
+    pub fn wglGetCurrentContext() -> *const c_char;
 }
 
 /* 

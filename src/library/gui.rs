@@ -74,7 +74,7 @@ pub fn run() {
         }
         
         let title = CString::new("Rust chess (OpenGL)").unwrap();
-
+        
         window = glfwCreateWindow(640, 480, title.as_ptr(), monitor, share);
         if window.is_null() {
             glfwTerminate();
@@ -85,7 +85,7 @@ pub fn run() {
 
         println!("{:?}", CStr::from_ptr(glGetString(GL_VERSION) as *const i8));
         
-        /* 
+        /*
         let mut i: GLint = 0;
         glGetIntegerv(GL_NUM_EXTENSIONS, &mut i as *mut GLint);
         println!("{:?}", i);
@@ -101,18 +101,20 @@ pub fn run() {
         }
         */
         
+        
         let positions: [c_float; 6] = [-0.5, -0.5, 0.0,  0.5, 0.5, -0.5];
         let mut buffer: c_uint = 0;
         _glGenBuffers()(1, &mut buffer);
         _glBindBuffer()(GL_ARRAY_BUFFER, buffer);
         _glBufferData()(GL_ARRAY_BUFFER, (6 * size_of::<c_float>()) as GLsizeiptr, positions.as_ptr() as *const c_void, GL_STATIC_DRAW);
-        
         _glEnableVertexAttribArray()(0);
         _glVertexAttribPointer()(0, 2, GL_FLOAT, GL_FALSE, 2 * size_of::<c_float>() as i32, 0 as *mut c_void);
+        
+        _glBindBuffer()(GL_ARRAY_BUFFER, 0);
 
         let vertex_shader = CString::new(format!("{}{}{}{}{}{}{}{}{}",
-            "#version 330 core\n", 
-            "\n",
+        "#version 330 core\n", 
+        "\n",
             "layout(location = 0) in vec4 position;\n", 
             "\n", 
             "void main()\n",
@@ -136,14 +138,14 @@ pub fn run() {
 
         let shader: GLuint = create_shader(vertex_shader, fragment_shader);
         _glUseProgram()(shader);       
+                
+//        let gl_draw_arrays = _glDrawArrays();
 
-        let gl_draw_arrays = _glDrawArrays();
-        
         while glfwWindowShouldClose(window) == 0 {
             
             glClear(GL_COLOR_BUFFER_BIT);
-            
-            gl_draw_arrays(GL_TRIANGLES, 0, 3);
+            //gl_draw_arrays(GL_TRIANGLES, 0, 3);
+            glDrawArrays(GL_TRIANGLES, 0, 3);
             
             glfwSwapBuffers(window);
             
