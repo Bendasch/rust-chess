@@ -4,7 +4,7 @@ use std::process;
 
 use rust_chess::library::config::*;
 use rust_chess::library::cli;
-use rust_chess::library::gui;
+use rust_chess::library::opengl::gui;
 
 fn main() {
     let config = Config::new(env::args()).unwrap_or_else(|err| {
