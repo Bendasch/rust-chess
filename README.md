@@ -1,12 +1,13 @@
 # DOING
-* OpenGL support
+* GUI in OpenGL
+* Macro for function pointer "generation"
 
 # BACKLOG
-* Error propagation to frontend
+* Error propagation
 * AI making legal moves
 * Add how to play
 * Save / export (FEN) positions
-* Vulkan support
+* GUI in Vulkan
 
 # Done
 - [x] Added MIT license
