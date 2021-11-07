@@ -19,4 +19,5 @@ extern "C" {
     pub fn glfwSwapBuffers(window: *mut GLFWwindow);
     pub fn glfwPollEvents();
     pub fn glfwTerminate();
+    pub fn glfwSwapInterval(interval: c_int);
 }

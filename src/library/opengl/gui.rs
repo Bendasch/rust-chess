@@ -10,6 +10,20 @@ use std::io::Read;
 #[allow(unused_imports)]
 use libc::{c_int, c_uint, c_char, c_uchar, c_float, c_void};
 
+#[cfg(debug_assertions)]
+#[macro_export]
+macro_rules! gl {
+    ($e:expr) => {
+        gl_clear_errors(); 
+        $e; gl_print_errors(file!(), line!());
+    };
+}
+#[cfg(not(debug_assertions))]
+#[macro_export]
+macro_rules! gl {
+    ($e:expr) => {$e;}
+}
+
 /*
 fn print_type_of<T>(_: &T) {
     println!("{}", std::any::type_name::<T>())
@@ -87,6 +101,8 @@ pub fn run() {
 
         println!("{:?}", CStr::from_ptr(glGetString(GL_VERSION) as *const i8));
         
+        glfwSwapInterval(1);
+
         /*
         let mut i: GLint = 0;
         glGetIntegerv(GL_NUM_EXTENSIONS, &mut i as *mut GLint);
@@ -103,41 +119,123 @@ pub fn run() {
         }
         */
         
+        let positions: [c_float; 8] = [
+            -0.5,  -0.5, 
+             0.5,  -0.5, 
+             0.5,   0.5,
+            -0.5,   0.5,
+        ];
         
-        let positions: [c_float; 6] = [-0.5, -0.5, 0.0,  0.5, 0.5, -0.5];
+        let gl_gen_buffers = _glGenBuffers();
+        let gl_bind_buffer = _glBindBuffer();
+        let gl_buffer_data = _glBufferData();
+
         let mut buffer: c_uint = 0;
-        _glGenBuffers()(1, &mut buffer);
-        _glBindBuffer()(GL_ARRAY_BUFFER, buffer);
-        _glBufferData()(GL_ARRAY_BUFFER, (6 * size_of::<c_float>()) as GLsizeiptr, positions.as_ptr() as *const c_void, GL_STATIC_DRAW);
+        gl_gen_buffers(1, &mut buffer);
+        gl_bind_buffer(GL_ARRAY_BUFFER, buffer);
+        gl_buffer_data(GL_ARRAY_BUFFER, (4 * 2 * size_of::<c_float>()) as GLsizeiptr, positions.as_ptr() as *const c_void, GL_STATIC_DRAW);
+        //gl_bind_buffer(GL_ARRAY_BUFFER, 0);
+        
+        let indices: [c_uint; 6] = [
+            0, 1, 2,
+            2, 3, 0
+        ];
+            
+        let mut ibo: c_uint = 0;
+        gl_gen_buffers(1, &mut ibo);
+        gl_bind_buffer(GL_ELEMENT_ARRAY_BUFFER, ibo);
+        gl_buffer_data(GL_ELEMENT_ARRAY_BUFFER, (2 * 3 * size_of::<c_uint>()) as GLsizeiptr, indices.as_ptr() as *const c_void, GL_STATIC_DRAW);
+        //gl_bind_buffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+        
         _glEnableVertexAttribArray()(0);
         _glVertexAttribPointer()(0, 2, GL_FLOAT, GL_FALSE, 2 * size_of::<c_float>() as i32, 0 as *mut c_void);
-        
-        _glBindBuffer()(GL_ARRAY_BUFFER, 0);
 
         let (vertex_shader, fragment_shader) = read_shaders_from_file();
         let shader: GLuint = create_shader(vertex_shader, fragment_shader);
-        _glUseProgram()(shader);       
-                
-//        let gl_draw_arrays = _glDrawArrays();
+        gl!(_glUseProgram()(shader));       
+        
+        let u_color = CString::new("u_Color").unwrap();
+        let location = _glGetUniformLocation()(shader, u_color.as_ptr() as *const GLchar);
+        let mut red = 0.5f32;
+        let mut red_increment = 0.005f32;
+        let mut green = 0.25f32;
+        let mut green_increment = 0.001f32;
+        let mut blue = 0.65f32;
+        let mut blue_increment = 0.01f32;
 
         while glfwWindowShouldClose(window) == 0 {
             
             glClear(GL_COLOR_BUFFER_BIT);
-            //gl_draw_arrays(GL_TRIANGLES, 0, 3);
-            glDrawArrays(GL_TRIANGLES, 0, 3);
             
+            //gl_draw_arrays(GL_TRIANGLES, 0, 3);
+            //glDrawArrays(GL_TRIANGLES, 0, 6);
+            
+            gl!(_glUniform4f()(location, red, green, blue, 0.9f32));
+            gl!(glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0 as *mut c_void));
+
+            if red > 0.9 || red < 0.1 {
+                red_increment *= -1.0f32; 
+            }
+
+            if green > 0.7 || green < 0.3 {
+                green_increment *= -1.0f32;
+            }
+
+            if blue > 0.95 || blue < 0.05 {
+                blue_increment *= -1.0f32;
+            }
+
+            red += red_increment;
+            green += green_increment;
+            blue += blue_increment;
+
             glfwSwapBuffers(window);
             
             glfwPollEvents();
         }
         
+        _glDeleteProgram()(shader);
         glfwTerminate();
     }
 }
 
+unsafe fn gl_clear_errors() {
+    loop {
+        if glGetError() == GL_NO_ERROR {
+            return
+        }
+    }
+}
+
+unsafe fn gl_print_errors(file: &str, line: u32) {
+    loop {
+        let error = glGetError();
+        match error {
+            GL_NO_ERROR => return,
+            GL_INVALID_ENUM      => println!("OpenGL-Error: Invalid enum.      ({}:{})", file, line),
+            GL_INVALID_VALUE     => println!("OpenGL-Error: Invalid value.     ({}:{})", file, line),
+            GL_INVALID_OPERATION => println!("OpenGL-Error: Invalid operation. ({}:{})", file, line),
+            GL_OUT_OF_MEMORY     => println!("OpenGL-Error: Out of memory.     ({}:{})", file, line),
+            _ => println!("OpenGL-Error: {:?}. ({}:{})", error, file, line)
+        };
+        
+        if error == GL_NO_ERROR {
+            return;
+        }
+    }
+}
+
+enum ShaderType {
+    None,
+    Vertex,
+    Fragment
+}
+
 fn read_shaders_from_file() -> (CString, CString) {
     
-    let (mut vertex, mut fragment) = (String::new(), String::new());
+    use ShaderType::*;
+
+    let (mut vertex_shader, mut fragment_shader) = (String::new(), String::new());
     
     let shader_file_name: &str = "./src/library/opengl/simple.shader";
     let mut file = File::open(shader_file_name).expect(format!("Couldn't read shader file {}", shader_file_name).as_str());
@@ -146,27 +244,28 @@ fn read_shaders_from_file() -> (CString, CString) {
     file.read_to_string(&mut contents).expect(format!("Couldn't read contents of file {}", shader_file_name).as_str());
     let lines: Vec<&str> = contents.split("\n").collect(); 
     
-    let mut mode = "___";
+    let mut mode: ShaderType = None;
+
     for line in lines {
         if line.trim().starts_with("#shader") {
             if line.trim() == "#shader vertex" {
-                mode = "ver";
+                mode = Vertex;
             } else if line.trim() == "#shader fragment" {
-                mode = "fra";
+                mode = Fragment;
             }
             continue;
         }
         match mode {
-            "ver" => { vertex.push_str(line); vertex.push_str("\n"); },
-            "fra" => { fragment.push_str(line); fragment.push_str("\n"); },
-            _ => continue
+            Vertex => { vertex_shader.push_str(line); vertex_shader.push_str("\n"); },
+            Fragment => { fragment_shader.push_str(line); fragment_shader.push_str("\n"); },
+            None => continue
         }
     }
 
-    let vertex = CString::new(vertex).unwrap();
-    let fragment = CString::new(fragment).unwrap();
+    let vertex_shader = CString::new(vertex_shader).unwrap();
+    let fragment_shader = CString::new(fragment_shader).unwrap();
 
-    (vertex, fragment)
+    (vertex_shader, fragment_shader)
 }
 
 #[cfg(test)]

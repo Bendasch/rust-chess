@@ -17,6 +17,7 @@ extern "C" {
 */
 pub const GL_EXTENSIONS: GLenum = 0x1F03;
 pub const GL_ARRAY_BUFFER: GLenum = 0x8892;    
+pub const GL_ELEMENT_ARRAY_BUFFER: GLenum = 0x8893;
 
 pub const GL_STREAM_DRAW: GLenum = 0x88E0;
 pub const GL_STREAM_READ: GLenum = 0x88E1;
@@ -190,4 +191,25 @@ pub unsafe fn _glGetShaderInfoLog() -> fn(shader: GLuint, maxLength: GLsizei, le
     let function_name = CString::new("glGetShaderInfoLog").unwrap();
     let function_pointer = wglGetProcAddress(function_name.as_ptr());
     transmute::<*const (), fn(shader: GLuint, maxLength: GLsizei, length: *mut GLsizei, infoLog: *mut GLchar)> (function_pointer)
+}
+
+#[allow(non_snake_case)]
+pub unsafe fn _glDeleteProgram() -> fn(program: GLuint) {
+    let function_name = CString::new("glDeleteProgram").unwrap();
+    let function_pointer = wglGetProcAddress(function_name.as_ptr());
+    transmute::<*const (), fn(program: GLuint)> (function_pointer)
+}
+
+#[allow(non_snake_case)]
+pub unsafe fn _glUniform4f() -> fn(location: GLint, v0: GLfloat, v1: GLfloat, v2: GLfloat, v3: GLfloat) {
+    let function_name = CString::new("glUniform4f").unwrap();
+    let function_pointer = wglGetProcAddress(function_name.as_ptr());
+    transmute::<*const (), fn(location: GLint, v0: GLfloat, v1: GLfloat, v2: GLfloat, v3: GLfloat)> (function_pointer)
+}
+
+#[allow(non_snake_case)]
+pub unsafe fn _glGetUniformLocation() -> fn(program: GLuint, name: *const GLchar) -> GLint {
+    let function_name = CString::new("glGetUniformLocation").unwrap();
+    let function_pointer = wglGetProcAddress(function_name.as_ptr());
+    transmute::<*const (), fn(program: GLuint, name: *const GLchar) -> GLint> (function_pointer)
 }

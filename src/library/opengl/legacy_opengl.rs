@@ -25,6 +25,12 @@ pub const GL_NUM_EXTENSIONS: GLenum = 0x821D;
 pub const GL_TRUE: GLboolean = 1;
 pub const GL_FALSE: GLboolean = 0;
 
+pub const GL_NO_ERROR: GLenum = 0;
+pub const GL_INVALID_ENUM: GLenum = 0x0500;
+pub const GL_INVALID_VALUE: GLenum = 0x0501;
+pub const GL_INVALID_OPERATION: GLenum = 0x0502;
+pub const GL_OUT_OF_MEMORY: GLenum = 0x0505;
+
 pub const GL_COLOR_BUFFER_BIT: GLenum = 0x00004000;     // Indicates the buffers currently enabled for color writing.
 pub const GL_DEPTH_BUFFER_BIT: GLenum = 0x00000100;     // Indicates the depth buffer.
 pub const GL_ACCUM_BUFFER_BIT: GLenum = 0x00000200;     // Indicates the accumulation buffer.
@@ -61,4 +67,6 @@ extern "C" {
     pub fn glGetIntegerv(pname: GLenum, data: *mut GLint);
     pub fn glGetString(name: GLenum) -> *const GLubyte;
     pub fn glDrawArrays(mode: GLenum, first: GLint, count: GLsizei);
+    pub fn glDrawElements(mode: GLenum, count: GLsizei, _type: GLenum, indices: *const c_void);
+    pub fn glGetError() -> GLenum;
 }
