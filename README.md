@@ -1,6 +1,5 @@
 # DOING
 * GUI in OpenGL
-* Macro for function pointer "generation"
 
 # BACKLOG
 * Error propagation

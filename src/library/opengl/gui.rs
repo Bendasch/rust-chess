@@ -1,6 +1,5 @@
 use crate::library::glfw::*;
-use crate::library::opengl::legacy_opengl::*;
-use crate::library::opengl::modern_opengl::*;
+use crate::library::opengl::opengl::*;
 use std::ffi::{CString, CStr};
 use std::ptr::{null_mut};
 use std::mem::size_of;
@@ -17,22 +16,22 @@ macro_rules! gl {
         gl_clear_errors(); 
         $e; gl_print_errors(file!(), line!());
     };
+    ($s:stmt) => {        
+        gl_clear_errors(); 
+        $s gl_print_errors(file!(), line!());
+    }
 }
 #[cfg(not(debug_assertions))]
 #[macro_export]
 macro_rules! gl {
-    ($e:expr) => {$e;}
+    ($e:expr) => {$e;};
+    ($s:stmt) => {$s};
 }
 
-/*
-fn print_type_of<T>(_: &T) {
-    println!("{}", std::any::type_name::<T>())
-}
-*/
-
-unsafe fn compile_shader(_type: GLenum, source: CString) -> GLuint {
+unsafe fn compile_shader(_type: GLenum, source: CString, gl: &GL) -> GLuint {
     
-    let id = _glCreateShader()(_type);
+    //let id = _glCreateShader()(_type);
+    let id = gl.create_shader(_type);
     let src: *const c_char = source.as_ptr();
     let ptr: *const *const c_char = &src;
     
@@ -59,11 +58,11 @@ unsafe fn compile_shader(_type: GLenum, source: CString) -> GLuint {
     return id;
 }
 
-unsafe fn create_shader(vertex_shader: CString, fragment_shader: CString) -> GLuint {
+unsafe fn create_shader(vertex_shader: CString, fragment_shader: CString, gl: &GL) -> GLuint {
 
     let program = _glCreateProgram()();    
-    let vertex_shader = compile_shader(GL_VERTEX_SHADER, vertex_shader);
-    let fragment_shader = compile_shader(GL_FRAGMENT_SHADER, fragment_shader);
+    let vertex_shader = compile_shader(GL_VERTEX_SHADER, vertex_shader, gl);
+    let fragment_shader = compile_shader(GL_FRAGMENT_SHADER, fragment_shader, gl);
     
     _glAttachShader()(program, vertex_shader);   
     _glAttachShader()(program, fragment_shader);   
@@ -99,6 +98,8 @@ pub fn run() {
         
         glfwMakeContextCurrent(window);
 
+        let gl: GL = GL::bind();
+
         println!("{:?}", CStr::from_ptr(glGetString(GL_VERSION) as *const i8));
         
         glfwSwapInterval(1);
@@ -126,15 +127,14 @@ pub fn run() {
             -0.5,   0.5,
         ];
         
-        let gl_gen_buffers = _glGenBuffers();
+        //let glGenBuffers = _glGenBuffers();
         let gl_bind_buffer = _glBindBuffer();
         let gl_buffer_data = _glBufferData();
 
         let mut buffer: c_uint = 0;
-        gl_gen_buffers(1, &mut buffer);
+        gl.gen_buffers(1, &mut buffer);
         gl_bind_buffer(GL_ARRAY_BUFFER, buffer);
         gl_buffer_data(GL_ARRAY_BUFFER, (4 * 2 * size_of::<c_float>()) as GLsizeiptr, positions.as_ptr() as *const c_void, GL_STATIC_DRAW);
-        //gl_bind_buffer(GL_ARRAY_BUFFER, 0);
         
         let indices: [c_uint; 6] = [
             0, 1, 2,
@@ -142,7 +142,7 @@ pub fn run() {
         ];
             
         let mut ibo: c_uint = 0;
-        gl_gen_buffers(1, &mut ibo);
+        gl.gen_buffers(1, &mut ibo);
         gl_bind_buffer(GL_ELEMENT_ARRAY_BUFFER, ibo);
         gl_buffer_data(GL_ELEMENT_ARRAY_BUFFER, (2 * 3 * size_of::<c_uint>()) as GLsizeiptr, indices.as_ptr() as *const c_void, GL_STATIC_DRAW);
         //gl_bind_buffer(GL_ELEMENT_ARRAY_BUFFER, 0);
@@ -151,11 +151,11 @@ pub fn run() {
         _glVertexAttribPointer()(0, 2, GL_FLOAT, GL_FALSE, 2 * size_of::<c_float>() as i32, 0 as *mut c_void);
 
         let (vertex_shader, fragment_shader) = read_shaders_from_file();
-        let shader: GLuint = create_shader(vertex_shader, fragment_shader);
+        let shader: GLuint = create_shader(vertex_shader, fragment_shader, &gl);
         gl!(_glUseProgram()(shader));       
         
         let u_color = CString::new("u_Color").unwrap();
-        let location = _glGetUniformLocation()(shader, u_color.as_ptr() as *const GLchar);
+        gl!(let location = _glGetUniformLocation()(shader, u_color.as_ptr() as *const GLchar));
         let mut red = 0.5f32;
         let mut red_increment = 0.005f32;
         let mut green = 0.25f32;
@@ -166,11 +166,8 @@ pub fn run() {
         while glfwWindowShouldClose(window) == 0 {
             
             glClear(GL_COLOR_BUFFER_BIT);
-            
-            //gl_draw_arrays(GL_TRIANGLES, 0, 3);
-            //glDrawArrays(GL_TRIANGLES, 0, 6);
-            
-            gl!(_glUniform4f()(location, red, green, blue, 0.9f32));
+                        
+            gl!(glUniform4f(location, red, green, blue, 0.9f32));
             gl!(glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0 as *mut c_void));
 
             if red > 0.9 || red < 0.1 {
@@ -199,6 +196,7 @@ pub fn run() {
     }
 }
 
+#[cfg(debug_assertions)]
 unsafe fn gl_clear_errors() {
     loop {
         if glGetError() == GL_NO_ERROR {
@@ -207,6 +205,7 @@ unsafe fn gl_clear_errors() {
     }
 }
 
+#[cfg(debug_assertions)]
 unsafe fn gl_print_errors(file: &str, line: u32) {
     loop {
         let error = glGetError();
