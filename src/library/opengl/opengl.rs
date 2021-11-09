@@ -14,9 +14,62 @@ extern "C" {
     pub fn wglGetCurrentContext() -> *const c_char;
 }
 
+/* 
+    UTILITY TO CLEAN UP FUNCTION BINDING
+*/
 pub unsafe fn get_function_pointer(name: &str) -> *const () {
     let function_name = CString::new(name).unwrap();
     wglGetProcAddress(function_name.as_ptr())
+}
+
+macro_rules! bind {
+    (pub struct GL {
+        $($name:ident: fn($( $param:ident: $typ:ty ),*) $(-> $ret:ty)*),* $(,)* 
+    }) => {
+        
+        #[allow(non_snake_case)]
+        pub struct GL {
+            $(pub $name: fn($( $param: $typ ),*) $(-> $ret)*),*
+        }
+
+        #[allow(non_snake_case)]
+        impl GL {
+        
+            pub unsafe fn bind() -> GL {
+                GL {
+                    $(
+                        $name: transmute::<*const (), fn($( $param: $typ ),*) $(-> $ret)*> (get_function_pointer(stringify!($name)))
+                    ),*
+                }
+            }
+        }
+    }
+}
+
+macro_rules! map_func_modern {
+    ($fn:ident, $glname:ident: fn($( $param:ident: $typ:ty ),*)) => {
+        pub fn $fn(&self, $( $param: $typ ),*) {
+            (self.$glname)($( $param ),*);
+        }
+    };
+    ($fn:ident, $glname:ident: fn($( $param:ident: $typ:ty ),*) $(-> $ret:ty)*) => {
+        pub fn $fn(&self, $( $param: $typ ),*) $(-> $ret)* {
+            (self.$glname)($( $param ),*)
+        }
+    };
+}
+
+macro_rules! map_func_legacy {
+    ($fn:ident, $glname:ident: fn($( $param:ident: $typ:ty ),*)) => {
+        pub unsafe fn $fn(&self, $( $param: $typ ),*) {
+            $glname($( $param ),*);
+        }
+    };
+    ($fn:ident, $glname:ident: fn($( $param:ident: $typ:ty ),*) $(-> $ret:ty)*) => {
+        pub unsafe fn $fn(&self, $( $param: $typ ),*) $(-> $ret)* {
+            $glname($( $param ),*)
+        }
+    };
 }
 
 /*
@@ -29,7 +82,7 @@ pub type GLfloat = c_float;
 pub type GLbitfield = c_int;
 pub type GLubyte = c_uchar;
 pub type GLsizei = c_int;
-pub type GLsizeiptr = c_uchar;
+pub type GLsizeiptr = c_int; // not c_uchar!!
 pub type GLvoid = c_void;
 pub type GLboolean = c_char;
 pub type GLchar = c_char;
@@ -89,6 +142,7 @@ pub const GL_INFO_LOG_LENGTH: GLenum = 0x8B84;
 
 /* 
     OPENGL LEGACY FUNCTION POINTERS
+    > linked statically to Opengl32.lib 
 */
 #[link(name = "Opengl32")]
 extern "C" {
@@ -103,197 +157,75 @@ extern "C" {
     pub fn glGetError() -> GLenum;
 }
 
-/*
-    OPENGL MODERN FUNCTION POINTERS
-*/
 #[allow(non_snake_case)]
-pub unsafe fn _glGetStringi() -> fn(name: GLenum, index: GLuint) -> *const GLubyte {
-    let function_name = CString::new("glGetStringi").unwrap();
-    let function_pointer = wglGetProcAddress(function_name.as_ptr());
-    transmute::<*const (), fn(name: GLenum, index: GLuint) -> *const GLubyte> (function_pointer)   
+bind!{
+    pub struct GL {
+
+        /*
+            OPENGL MODERN FUNCTION POINTERS
+            > extracted on startup through wglGetProcAddress
+        */
+        glCreateShader: fn(shaderType: GLenum) -> GLuint,
+        glGenBuffers: fn(n: GLsizei, buffers: *mut GLuint),
+        glGetUniformLocation: fn(program: GLuint, name: *const GLchar) -> GLint,
+        glUniform4f: fn(location: GLint, v0: GLfloat, v1: GLfloat, v2: GLfloat, v3: GLfloat),
+        glDeleteProgram: fn(program: GLuint),
+        glGetShaderInfoLog: fn(shader: GLuint, maxLength: GLsizei, length: *mut GLsizei, infoLog: *mut GLchar),
+        glGetShaderiv: fn(shader: GLuint, pname: GLenum, params: *const GLint),
+        glDeleteShader: fn(shader: GLuint),
+        glUseProgram: fn(program: GLuint),
+        glValidateProgram: fn(program: GLuint),
+        glLinkProgram: fn(program: GLuint),
+        glAttachShader: fn(program: GLuint, shader: GLuint),
+        glCompileShader: fn(shader: GLuint),
+        glShaderSource: fn(shader: GLuint, count: GLsizei, string: *const *const GLchar, length: *const GLint),
+        glCreateProgram: fn() -> GLuint,
+        glVertexAttribPointer: fn(index: GLuint, size: GLint, _type: GLenum, normalized: GLboolean, stride: GLsizei, function_pointer: *const GLvoid),
+        glEnableVertexAttribArray: fn(index: GLuint),
+        glBufferData: fn(target: GLenum, size: GLsizeiptr, data: *const c_void, usage: GLenum),
+        glBindBuffer: fn(target: GLenum, buffer: GLuint),
+        glGetStringi:fn(name: GLenum, index: GLuint) -> *const GLubyte
+    }
 }
 
 #[allow(non_snake_case)]
-pub unsafe fn _glBindBuffer() -> fn(target: GLenum, buffer: GLuint) {
-    let function_name = CString::new("glBindBuffer").unwrap();
-    let function_pointer = wglGetProcAddress(function_name.as_ptr());
-    transmute::<*const (), fn(target: GLenum, buffer: GLuint)> (function_pointer)   
-}
-
-#[allow(non_snake_case)]
-pub unsafe fn _glBufferData() -> fn(
-    target: GLenum, 
-    size: GLsizeiptr,
-    data: *const c_void,
-    usage: GLenum
-) {
-    let function_name = CString::new("glBufferData").unwrap();
-    let function_pointer = wglGetProcAddress(function_name.as_ptr());
-    transmute::<*const (), fn(target: GLenum, size: GLsizeiptr, data: *const c_void, usage: GLenum)> (function_pointer)   
-}
-
-#[allow(non_snake_case)]
-pub unsafe fn _glDrawArrays() -> fn(mode: GLenum, first: GLint, count: GLsizei) {
-    let function_name = CString::new("glDrawArrays").unwrap();
-    let function_pointer = wglGetProcAddress(function_name.as_ptr());
-    transmute::<*const (), fn(mode: GLenum, first: GLint, count: GLsizei)> (function_pointer)   
-}
-
-#[allow(non_snake_case)]
-pub unsafe fn _glDrawElements() -> fn(mode: GLenum, count: GLsizei, _type: GLenum, indices: *const GLvoid) {
-    let function_name = CString::new("glDrawElements").unwrap();
-    let function_pointer = wglGetProcAddress(function_name.as_ptr());
-    transmute::<*const (), fn(mode: GLenum, count: GLsizei, _type: GLenum, indices: *const GLvoid)> (function_pointer)   
-}
-
-#[allow(non_snake_case)]
-pub unsafe fn _glEnableVertexAttribArray() -> fn(index: GLuint) {
-    let function_name = CString::new("glEnableVertexAttribArray").unwrap();
-    let function_pointer = wglGetProcAddress(function_name.as_ptr());
-    transmute::<*const (), fn(index: GLuint)> (function_pointer)   
-}
-
-#[allow(non_snake_case)]
-pub unsafe fn _glVertexAttribPointer() -> fn(
-    index: GLuint, 
-    size: GLint, 
-    _type: GLenum, 
-    normalized: GLboolean, 
-    stride: GLsizei, 
-    function_pointer: *const GLvoid
-) {
-    let function_name = CString::new("glVertexAttribPointer").unwrap();
-    let function_pointer = wglGetProcAddress(function_name.as_ptr());
-    transmute::<*const (), fn(index: GLuint, size: GLint, _type: GLenum, normalized: GLboolean, stride: GLsizei, function_pointer: *const GLvoid)> (function_pointer)   
-}
-
-
-#[allow(non_snake_case)]
-pub unsafe fn _glCreateProgram() -> fn() -> GLuint{
-    let function_name = CString::new("glCreateProgram").unwrap();
-    let function_pointer = wglGetProcAddress(function_name.as_ptr());
-    transmute::<*const (), fn() -> GLuint> (function_pointer)   
-}
-
-#[allow(non_snake_case)]
-pub unsafe fn _glShaderSource() -> fn(
-    shader: GLuint,
-    count: GLsizei,
-    string: *const *const GLchar, 
-    length: *const GLint
-) {
-    let function_name = CString::new("glShaderSource").unwrap();
-    let function_pointer = wglGetProcAddress(function_name.as_ptr());
-    transmute::<*const (), fn(shader: GLuint, count: GLsizei,string: *const *const GLchar, length: *const GLint)> (function_pointer)   
-}
-
-#[allow(non_snake_case)]
-pub unsafe fn _glCompileShader() -> fn(shader: GLuint) {
-    let function_name = CString::new("glCompileShader").unwrap();
-    let function_pointer = wglGetProcAddress(function_name.as_ptr());
-    transmute::<*const (), fn(shader: GLuint)> (function_pointer)
-}
-
-#[allow(non_snake_case)]
-pub unsafe fn _glAttachShader() -> fn(program: GLuint, shader: GLuint) {
-    let function_name = CString::new("glAttachShader").unwrap();
-    let function_pointer = wglGetProcAddress(function_name.as_ptr());
-    transmute::<*const (), fn(program: GLuint, shader: GLuint)> (function_pointer)
-}
-
-#[allow(non_snake_case)]
-pub unsafe fn _glLinkProgram() -> fn(program: GLuint) {
-    let function_name = CString::new("glLinkProgram").unwrap();
-    let function_pointer = wglGetProcAddress(function_name.as_ptr());
-    transmute::<*const (), fn(program: GLuint)> (function_pointer)
-}
-
-#[allow(non_snake_case)]
-pub unsafe fn _glValidateProgram() -> fn(program: GLuint) {
-    let function_name = CString::new("glValidateProgram").unwrap();
-    let function_pointer = wglGetProcAddress(function_name.as_ptr());
-    transmute::<*const (), fn(program: GLuint)> (function_pointer)
-}
-
-#[allow(non_snake_case)]
-pub unsafe fn _glUseProgram() -> fn(program: GLuint) {
-    let function_name = CString::new("glUseProgram").unwrap();
-    let function_pointer = wglGetProcAddress(function_name.as_ptr());
-    transmute::<*const (), fn(program: GLuint)> (function_pointer)
-}
-
-#[allow(non_snake_case)]
-pub unsafe fn _glDeleteShader() -> fn(shader: GLuint) {
-    let function_name = CString::new("glDeleteShader").unwrap();
-    let function_pointer = wglGetProcAddress(function_name.as_ptr());
-    transmute::<*const (), fn(shader: GLuint)> (function_pointer)
-}
-
-#[allow(non_snake_case)]
-pub unsafe fn _glGetShaderiv() -> fn(shader: GLuint, pname: GLenum, params: *const GLint) {
-    let function_name = CString::new("glGetShaderiv").unwrap();
-    let function_pointer = wglGetProcAddress(function_name.as_ptr());
-    transmute::<*const (), fn(shader: GLuint, pname: GLenum, params: *const GLint)> (function_pointer)
-}
-
-#[allow(non_snake_case)]
-pub unsafe fn _glGetShaderInfoLog() -> fn(shader: GLuint, maxLength: GLsizei, length: *mut GLsizei, infoLog: *mut GLchar) {
-    let function_name = CString::new("glGetShaderInfoLog").unwrap();
-    let function_pointer = wglGetProcAddress(function_name.as_ptr());
-    transmute::<*const (), fn(shader: GLuint, maxLength: GLsizei, length: *mut GLsizei, infoLog: *mut GLchar)> (function_pointer)
-}
-
-#[allow(non_snake_case)]
-pub unsafe fn _glDeleteProgram() -> fn(program: GLuint) {
-    let function_name = CString::new("glDeleteProgram").unwrap();
-    let function_pointer = wglGetProcAddress(function_name.as_ptr());
-    transmute::<*const (), fn(program: GLuint)> (function_pointer)
-}
-
-#[allow(non_snake_case)]
-pub unsafe fn glUniform4f(location: GLint, v0: GLfloat, v1: GLfloat, v2: GLfloat, v3: GLfloat) {
-    let function_name = CString::new("glUniform4f").unwrap();
-    let function_pointer = wglGetProcAddress(function_name.as_ptr());
-    let gl_uniform_4f = transmute::<*const (), fn(location: GLint, v0: GLfloat, v1: GLfloat, v2: GLfloat, v3: GLfloat)> (function_pointer);
-    gl_uniform_4f(location, v0, v1, v2, v3);
-}
-
-#[allow(non_snake_case)]
-pub unsafe fn _glGetUniformLocation() -> fn(program: GLuint, name: *const GLchar) -> GLint {
-    let function_name = CString::new("glGetUniformLocation").unwrap();
-    let function_pointer = wglGetProcAddress(function_name.as_ptr());
-    transmute::<*const (), fn(program: GLuint, name: *const GLchar) -> GLint> (function_pointer)
-}
-
-#[allow(non_snake_case)]
-pub unsafe fn _glCreateShader() -> fn(shaderType: GLenum) -> GLuint{
-    let function_name = CString::new("glCreateShader").unwrap();
-    let function_pointer = wglGetProcAddress(function_name.as_ptr());
-    transmute::<*const (), fn(shaderType: GLenum) -> GLuint> (function_pointer)   
-}
-
-
-#[allow(non_snake_case)]
-pub struct GL {
-    pub glGenBuffers: fn(n: GLsizei, buffers: *mut GLuint),
-    pub glCreateShader: fn(shaderType: GLenum) -> GLuint
-}
-
 impl GL {
+    
+    /* 
+        Legacy functions
+    */
+    map_func_legacy!{clear, glClear: fn(mask: GLbitfield)}
+    map_func_legacy!{begin, glBegin: fn(mode: GLenum )}
+    map_func_legacy!{end, glEnd: fn()}
+    map_func_legacy!{vertex_2f, glVertex2f: fn(x: GLfloat, y: GLfloat)} 
+    map_func_legacy!{get_intergerv, glGetIntegerv: fn(pname: GLenum, data: *mut GLint)}
+    map_func_legacy!{get_string, glGetString: fn(name: GLenum) -> *const GLubyte}
+    map_func_legacy!{draw_elements, glDrawElements: fn(mode: GLenum, count: GLsizei, _type: GLenum, indices: *const GLvoid)}
+    map_func_legacy!{draw_arrays, glDrawArrays: fn(mode: GLenum, first: GLint, count: GLsizei)}
+    map_func_legacy!{get_error, glGetError: fn() -> GLenum}    
 
-    pub unsafe fn bind() -> GL {
-        GL {
-            glCreateShader: transmute::<*const (), fn(shaderType: GLenum) -> GLuint> (get_function_pointer("glCreateShader")),
-            glGenBuffers: transmute::<*const (), fn(n: GLsizei, buffers: *mut GLuint)> (get_function_pointer("glGenBuffers")),
-        }
-    }
-    
-    pub fn create_shader(&self, shader_type: GLenum) -> GLuint {
-        (self.glCreateShader)(shader_type)
-    }
-    
-    pub fn gen_buffers(&self, n: GLsizei, buffers: *mut GLuint) {
-        (self.glGenBuffers)(n, buffers)
-    }
+    /*
+        Modern functions    
+    */
+    map_func_modern!{create_shader, glCreateShader: fn(shaderType: GLenum) -> GLuint}
+    map_func_modern!{gen_buffers, glGenBuffers: fn(n: GLsizei, buffers: *mut GLuint)}
+    map_func_modern!{get_uniform_location, glGetUniformLocation: fn(program: GLuint, name: *const GLchar) -> GLint}
+    map_func_modern!{uniform_4f, glUniform4f: fn(location: GLint, v0: GLfloat, v1: GLfloat, v2: GLfloat, v3: GLfloat)}
+    map_func_modern!{delete_program, glDeleteProgram: fn(program: GLuint)}
+    map_func_modern!{get_shader_infolog, glGetShaderInfoLog: fn(shader: GLuint, maxLength: GLsizei, length: *mut GLsizei, infoLog: *mut GLchar)}
+    map_func_modern!{get_shaderiv, glGetShaderiv: fn(shader: GLuint, pname: GLenum, params: *const GLint)}
+    map_func_modern!{delete_shader, glDeleteShader: fn(shader: GLuint)}
+    map_func_modern!{use_program, glUseProgram: fn(program: GLuint)}
+    map_func_modern!{validate_program, glValidateProgram: fn(program: GLuint)}
+    map_func_modern!{link_program, glLinkProgram: fn(program: GLuint)}
+    map_func_modern!{attach_shader, glAttachShader: fn(program: GLuint, shader: GLuint)}
+    map_func_modern!{compile_shader, glCompileShader: fn(shader: GLuint)}
+    map_func_modern!{shader_source, glShaderSource: fn(shader: GLuint, count: GLsizei, string: *const *const GLchar, length: *const GLint)}
+    map_func_modern!{create_program, glCreateProgram: fn() -> GLuint}
+    map_func_modern!{vertex_attrib_pointer, glVertexAttribPointer: fn(index: GLuint, size: GLint, _type: GLenum, normalized: GLboolean, stride: GLsizei, function_pointer: *const GLvoid)}
+    map_func_modern!{enable_vertex_attrib_array, glEnableVertexAttribArray: fn(index: GLuint)}
+    map_func_modern!{buffer_data, glBufferData: fn(target: GLenum, size: GLsizeiptr, data: *const c_void, usage: GLenum)}
+    map_func_modern!{bind_buffer, glBindBuffer: fn(target: GLenum, buffer: GLuint)}
+    map_func_modern!{get_stringi, glGetStringi:fn(name: GLenum, index: GLuint) -> *const GLubyte}
 }
 

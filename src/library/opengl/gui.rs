@@ -30,22 +30,21 @@ macro_rules! gl {
 
 unsafe fn compile_shader(_type: GLenum, source: CString, gl: &GL) -> GLuint {
     
-    //let id = _glCreateShader()(_type);
     let id = gl.create_shader(_type);
     let src: *const c_char = source.as_ptr();
     let ptr: *const *const c_char = &src;
     
-    _glShaderSource()(id, 1, ptr, null_mut());
-    _glCompileShader()(id);
+    gl.shader_source(id, 1, ptr, null_mut());
+    gl.compile_shader(id);
 
     let mut result: GLint = 0;
-    _glGetShaderiv()(id, GL_COMPILE_STATUS, &mut result);
+    gl.get_shaderiv(id, GL_COMPILE_STATUS, &mut result);
+    
     if result as i8 == GL_FALSE {
         let mut length: GLint = 0;
-        //_glGetShaderiv()(id, GL_INFO_LOG_LENGTH, &mut length);
         let mut message: [GLchar; 1024] = [0; 1024];
         let msg_pointer: *mut GLchar = &mut message[0];
-        _glGetShaderInfoLog()(id, 1024, &mut length, msg_pointer);        
+        gl.get_shader_infolog(id, 1024, &mut length, msg_pointer);        
         match _type {
             GL_VERTEX_SHADER => println!("Vertex shader failed."),
             GL_FRAGMENT_SHADER =>  println!("Fragment shader failed."),
@@ -60,18 +59,18 @@ unsafe fn compile_shader(_type: GLenum, source: CString, gl: &GL) -> GLuint {
 
 unsafe fn create_shader(vertex_shader: CString, fragment_shader: CString, gl: &GL) -> GLuint {
 
-    let program = _glCreateProgram()();    
+    let program = gl.create_program();    
     let vertex_shader = compile_shader(GL_VERTEX_SHADER, vertex_shader, gl);
     let fragment_shader = compile_shader(GL_FRAGMENT_SHADER, fragment_shader, gl);
     
-    _glAttachShader()(program, vertex_shader);   
-    _glAttachShader()(program, fragment_shader);   
+    gl.attach_shader(program, vertex_shader);   
+    gl.attach_shader(program, fragment_shader);   
     
-    _glLinkProgram()(program);
-    _glValidateProgram()(program);
+    gl.link_program(program);
+    gl.validate_program(program);
     
-    _glDeleteShader()(vertex_shader);
-    _glDeleteShader()(fragment_shader);
+    gl.delete_shader(vertex_shader);
+    gl.delete_shader(fragment_shader);
     
     return program;
 }
@@ -100,20 +99,19 @@ pub fn run() {
 
         let gl: GL = GL::bind();
 
-        println!("{:?}", CStr::from_ptr(glGetString(GL_VERSION) as *const i8));
+        println!("{:?}", CStr::from_ptr(gl.get_string(GL_VERSION) as *const i8));
         
         glfwSwapInterval(1);
 
-        /*
+        /* 
         let mut i: GLint = 0;
         glGetIntegerv(GL_NUM_EXTENSIONS, &mut i as *mut GLint);
         println!("{:?}", i);
         
         for index in 0..i {
-            let gl_get_stringi = _glGetStringi();
-            let ptr = gl_get_stringi(GL_EXTENSIONS, index as u32);
+            let ptr = gl.get_stringi(GL_EXTENSIONS, index as u32);
             if ptr.is_null() {
-                println!("Error on glGetStringi. Function pointer: {:?}", gl_get_stringi);
+                println!("Error on glGetStringi. Function pointer: {:?}", gl.glGetStringi);
             } else {
                 println!("{:?}", CStr::from_ptr(ptr  as *const i8));
             }
@@ -126,15 +124,11 @@ pub fn run() {
              0.5,   0.5,
             -0.5,   0.5,
         ];
-        
-        //let glGenBuffers = _glGenBuffers();
-        let gl_bind_buffer = _glBindBuffer();
-        let gl_buffer_data = _glBufferData();
 
         let mut buffer: c_uint = 0;
-        gl.gen_buffers(1, &mut buffer);
-        gl_bind_buffer(GL_ARRAY_BUFFER, buffer);
-        gl_buffer_data(GL_ARRAY_BUFFER, (4 * 2 * size_of::<c_float>()) as GLsizeiptr, positions.as_ptr() as *const c_void, GL_STATIC_DRAW);
+        gl!(gl.gen_buffers(1, &mut buffer));
+        gl!(gl.bind_buffer(GL_ARRAY_BUFFER, buffer));
+        gl!(gl.buffer_data(GL_ARRAY_BUFFER, (4 * 2 * size_of::<c_float>()) as GLsizeiptr, positions.as_ptr() as *const c_void, GL_STATIC_DRAW));
         
         let indices: [c_uint; 6] = [
             0, 1, 2,
@@ -142,20 +136,19 @@ pub fn run() {
         ];
             
         let mut ibo: c_uint = 0;
-        gl.gen_buffers(1, &mut ibo);
-        gl_bind_buffer(GL_ELEMENT_ARRAY_BUFFER, ibo);
-        gl_buffer_data(GL_ELEMENT_ARRAY_BUFFER, (2 * 3 * size_of::<c_uint>()) as GLsizeiptr, indices.as_ptr() as *const c_void, GL_STATIC_DRAW);
-        //gl_bind_buffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+        gl!(gl.gen_buffers(1, &mut ibo));
+        gl!(gl.bind_buffer(GL_ELEMENT_ARRAY_BUFFER, ibo));
+        gl!(gl.buffer_data(GL_ELEMENT_ARRAY_BUFFER, (2 * 3 * size_of::<c_uint>()) as GLsizeiptr, indices.as_ptr() as *const c_void, GL_STATIC_DRAW));
         
-        _glEnableVertexAttribArray()(0);
-        _glVertexAttribPointer()(0, 2, GL_FLOAT, GL_FALSE, 2 * size_of::<c_float>() as i32, 0 as *mut c_void);
+        gl.enable_vertex_attrib_array(0);
+        gl.vertex_attrib_pointer(0, 2, GL_FLOAT, GL_FALSE, 2 * size_of::<c_float>() as i32, 0 as *mut c_void);
 
         let (vertex_shader, fragment_shader) = read_shaders_from_file();
         let shader: GLuint = create_shader(vertex_shader, fragment_shader, &gl);
-        gl!(_glUseProgram()(shader));       
+        gl!(gl.use_program(shader));       
         
         let u_color = CString::new("u_Color").unwrap();
-        gl!(let location = _glGetUniformLocation()(shader, u_color.as_ptr() as *const GLchar));
+        gl!(let location = gl.get_uniform_location(shader, u_color.as_ptr() as *const GLchar));
         let mut red = 0.5f32;
         let mut red_increment = 0.005f32;
         let mut green = 0.25f32;
@@ -165,10 +158,10 @@ pub fn run() {
 
         while glfwWindowShouldClose(window) == 0 {
             
-            glClear(GL_COLOR_BUFFER_BIT);
+            gl.clear(GL_COLOR_BUFFER_BIT);
                         
-            gl!(glUniform4f(location, red, green, blue, 0.9f32));
-            gl!(glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0 as *mut c_void));
+            gl!(gl.uniform_4f(location, red, green, blue, 0.9f32));
+            gl!(gl.draw_elements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0 as *mut c_void));
 
             if red > 0.9 || red < 0.1 {
                 red_increment *= -1.0f32; 
@@ -191,7 +184,7 @@ pub fn run() {
             glfwPollEvents();
         }
         
-        _glDeleteProgram()(shader);
+        gl.delete_program(shader);
         glfwTerminate();
     }
 }
