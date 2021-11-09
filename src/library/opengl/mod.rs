@@ -1,3 +1,4 @@
 pub mod gui;
-pub mod renderer;
 pub mod opengl;
+pub mod renderer;
+pub mod vertex_buffer;

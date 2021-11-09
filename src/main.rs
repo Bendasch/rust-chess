@@ -23,7 +23,7 @@ fn main() {
 fn run(config: Config) -> Result<(),Box<dyn Error>> {
     match config.ui_type {
         UiType::CLI => cli::run(config.fen), 
-        UiType::GUI => gui::run()
+        UiType::GUI => unsafe{ gui::run() }
     }
     Ok(())
 }

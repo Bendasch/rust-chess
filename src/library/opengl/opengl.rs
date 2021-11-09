@@ -1,5 +1,3 @@
-extern crate proc_macro;
-
 #[allow(unused_imports)]
 use libc::{c_int, c_uint, c_char, c_uchar, c_float, c_void};
 use std::ffi::{CString};
@@ -186,7 +184,8 @@ bind!{
         glBindBuffer: fn(target: GLenum, buffer: GLuint),
         glGetStringi:fn(name: GLenum, index: GLuint) -> *const GLubyte,
         glGenVertexArrays: fn(n: GLsizei, arrays: *const GLuint),
-        glBindVertexArray: fn(array: GLuint)
+        glBindVertexArray: fn(array: GLuint),
+        glDeleteBuffers: fn(n: GLsizei, buffers: *const GLuint)  
     }
 }
 
@@ -204,8 +203,8 @@ impl GL {
     map_func_legacy!{get_string, glGetString: fn(name: GLenum) -> *const GLubyte}
     map_func_legacy!{draw_elements, glDrawElements: fn(mode: GLenum, count: GLsizei, _type: GLenum, indices: *const GLvoid)}
     map_func_legacy!{draw_arrays, glDrawArrays: fn(mode: GLenum, first: GLint, count: GLsizei)}
-    map_func_legacy!{get_error, glGetError: fn() -> GLenum}    
-
+    map_func_legacy!{get_error, glGetError: fn() -> GLenum}  
+    
     /*
         Modern functions    
     */
@@ -231,4 +230,5 @@ impl GL {
     map_func_modern!{get_stringi, glGetStringi:fn(name: GLenum, index: GLuint) -> *const GLubyte}
     map_func_modern!{gen_vertex_arrays, glGenVertexArrays: fn(n: GLsizei, arrays: *const GLuint)}
     map_func_modern!{bind_vertex_array, glBindVertexArray: fn(array: GLuint)}
+    map_func_modern!{delete_buffers, glDeleteBuffers: fn(n: GLsizei, buffers: *const GLuint)}  
 }
