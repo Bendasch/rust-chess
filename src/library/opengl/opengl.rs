@@ -184,7 +184,9 @@ bind!{
         glEnableVertexAttribArray: fn(index: GLuint),
         glBufferData: fn(target: GLenum, size: GLsizeiptr, data: *const c_void, usage: GLenum),
         glBindBuffer: fn(target: GLenum, buffer: GLuint),
-        glGetStringi:fn(name: GLenum, index: GLuint) -> *const GLubyte
+        glGetStringi:fn(name: GLenum, index: GLuint) -> *const GLubyte,
+        glGenVertexArrays: fn(n: GLsizei, arrays: *const GLuint),
+        glBindVertexArray: fn(array: GLuint)
     }
 }
 
@@ -198,7 +200,7 @@ impl GL {
     map_func_legacy!{begin, glBegin: fn(mode: GLenum )}
     map_func_legacy!{end, glEnd: fn()}
     map_func_legacy!{vertex_2f, glVertex2f: fn(x: GLfloat, y: GLfloat)} 
-    map_func_legacy!{get_intergerv, glGetIntegerv: fn(pname: GLenum, data: *mut GLint)}
+    map_func_legacy!{get_integerv, glGetIntegerv: fn(pname: GLenum, data: *mut GLint)}
     map_func_legacy!{get_string, glGetString: fn(name: GLenum) -> *const GLubyte}
     map_func_legacy!{draw_elements, glDrawElements: fn(mode: GLenum, count: GLsizei, _type: GLenum, indices: *const GLvoid)}
     map_func_legacy!{draw_arrays, glDrawArrays: fn(mode: GLenum, first: GLint, count: GLsizei)}
@@ -227,5 +229,6 @@ impl GL {
     map_func_modern!{buffer_data, glBufferData: fn(target: GLenum, size: GLsizeiptr, data: *const c_void, usage: GLenum)}
     map_func_modern!{bind_buffer, glBindBuffer: fn(target: GLenum, buffer: GLuint)}
     map_func_modern!{get_stringi, glGetStringi:fn(name: GLenum, index: GLuint) -> *const GLubyte}
+    map_func_modern!{gen_vertex_arrays, glGenVertexArrays: fn(n: GLsizei, arrays: *const GLuint)}
+    map_func_modern!{bind_vertex_array, glBindVertexArray: fn(array: GLuint)}
 }
-

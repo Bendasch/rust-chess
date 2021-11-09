@@ -1,3 +1,5 @@
+use crate::gl;
+use crate::library::opengl::renderer::*;
 use crate::library::glfw::*;
 use crate::library::opengl::opengl::*;
 use std::ffi::{CString, CStr};
@@ -5,46 +7,27 @@ use std::ptr::{null_mut};
 use std::mem::size_of;
 use std::fs::File;
 use std::io::Read;
-
 #[allow(unused_imports)]
 use libc::{c_int, c_uint, c_char, c_uchar, c_float, c_void};
 
-#[cfg(debug_assertions)]
-#[macro_export]
-macro_rules! gl {
-    ($e:expr) => {
-        gl_clear_errors(); 
-        $e; gl_print_errors(file!(), line!());
-    };
-    ($s:stmt) => {        
-        gl_clear_errors(); 
-        $s gl_print_errors(file!(), line!());
-    }
-}
-#[cfg(not(debug_assertions))]
-#[macro_export]
-macro_rules! gl {
-    ($e:expr) => {$e;};
-    ($s:stmt) => {$s};
-}
 
 unsafe fn compile_shader(_type: GLenum, source: CString, gl: &GL) -> GLuint {
     
-    let id = gl.create_shader(_type);
+    gl!(let id = gl.create_shader(_type));
     let src: *const c_char = source.as_ptr();
     let ptr: *const *const c_char = &src;
     
-    gl.shader_source(id, 1, ptr, null_mut());
-    gl.compile_shader(id);
+    gl!(gl.shader_source(id, 1, ptr, null_mut()));
+    gl!(gl.compile_shader(id));
 
     let mut result: GLint = 0;
-    gl.get_shaderiv(id, GL_COMPILE_STATUS, &mut result);
-    
+    gl!(gl.get_shaderiv(id, GL_COMPILE_STATUS, &mut result));
+
     if result as i8 == GL_FALSE {
         let mut length: GLint = 0;
         let mut message: [GLchar; 1024] = [0; 1024];
         let msg_pointer: *mut GLchar = &mut message[0];
-        gl.get_shader_infolog(id, 1024, &mut length, msg_pointer);        
+        gl!(gl.get_shader_infolog(id, 1024, &mut length, msg_pointer));        
         match _type {
             GL_VERTEX_SHADER => println!("Vertex shader failed."),
             GL_FRAGMENT_SHADER =>  println!("Fragment shader failed."),
@@ -59,18 +42,18 @@ unsafe fn compile_shader(_type: GLenum, source: CString, gl: &GL) -> GLuint {
 
 unsafe fn create_shader(vertex_shader: CString, fragment_shader: CString, gl: &GL) -> GLuint {
 
-    let program = gl.create_program();    
+    gl!(let program = gl.create_program());    
     let vertex_shader = compile_shader(GL_VERTEX_SHADER, vertex_shader, gl);
     let fragment_shader = compile_shader(GL_FRAGMENT_SHADER, fragment_shader, gl);
     
-    gl.attach_shader(program, vertex_shader);   
-    gl.attach_shader(program, fragment_shader);   
+    gl!(gl.attach_shader(program, vertex_shader));   
+    gl!(gl.attach_shader(program, fragment_shader));   
     
-    gl.link_program(program);
-    gl.validate_program(program);
+    gl!(gl.link_program(program));
+    gl!(gl.validate_program(program));
     
-    gl.delete_shader(vertex_shader);
-    gl.delete_shader(fragment_shader);
+    gl!(gl.delete_shader(vertex_shader));
+    gl!(gl.delete_shader(fragment_shader));
     
     return program;
 }
@@ -98,25 +81,11 @@ pub fn run() {
         glfwMakeContextCurrent(window);
 
         let gl: GL = GL::bind();
-
-        println!("{:?}", CStr::from_ptr(gl.get_string(GL_VERSION) as *const i8));
         
         glfwSwapInterval(1);
-
-        /* 
-        let mut i: GLint = 0;
-        glGetIntegerv(GL_NUM_EXTENSIONS, &mut i as *mut GLint);
-        println!("{:?}", i);
         
-        for index in 0..i {
-            let ptr = gl.get_stringi(GL_EXTENSIONS, index as u32);
-            if ptr.is_null() {
-                println!("Error on glGetStringi. Function pointer: {:?}", gl.glGetStringi);
-            } else {
-                println!("{:?}", CStr::from_ptr(ptr  as *const i8));
-            }
-        }
-        */
+        //print_opengl_version(&gl);
+        //print_opengl_extensions(&gl);
         
         let positions: [c_float; 8] = [
             -0.5,  -0.5, 
@@ -135,13 +104,17 @@ pub fn run() {
             2, 3, 0
         ];
             
+        let mut vao: c_uint = 0;
+        gl!(gl.gen_vertex_arrays(1, &mut vao));
+        gl!(gl.bind_vertex_array(vao));
+
         let mut ibo: c_uint = 0;
         gl!(gl.gen_buffers(1, &mut ibo));
         gl!(gl.bind_buffer(GL_ELEMENT_ARRAY_BUFFER, ibo));
         gl!(gl.buffer_data(GL_ELEMENT_ARRAY_BUFFER, (2 * 3 * size_of::<c_uint>()) as GLsizeiptr, indices.as_ptr() as *const c_void, GL_STATIC_DRAW));
         
-        gl.enable_vertex_attrib_array(0);
-        gl.vertex_attrib_pointer(0, 2, GL_FLOAT, GL_FALSE, 2 * size_of::<c_float>() as i32, 0 as *mut c_void);
+        gl!(gl.enable_vertex_attrib_array(0));
+        gl!(gl.vertex_attrib_pointer(0, 2, GL_FLOAT, GL_FALSE, 2 * size_of::<c_float>() as i32, 0 as *mut c_void));
 
         let (vertex_shader, fragment_shader) = read_shaders_from_file();
         let shader: GLuint = create_shader(vertex_shader, fragment_shader, &gl);
@@ -149,6 +122,12 @@ pub fn run() {
         
         let u_color = CString::new("u_Color").unwrap();
         gl!(let location = gl.get_uniform_location(shader, u_color.as_ptr() as *const GLchar));
+
+        gl!(gl.bind_vertex_array(0));
+        gl!(gl.use_program(0));
+        gl!(gl.bind_buffer(GL_ARRAY_BUFFER, 0));
+        gl!(gl.bind_buffer(GL_ELEMENT_ARRAY_BUFFER, 0));
+
         let mut red = 0.5f32;
         let mut red_increment = 0.005f32;
         let mut green = 0.25f32;
@@ -158,62 +137,39 @@ pub fn run() {
 
         while glfwWindowShouldClose(window) == 0 {
             
-            gl.clear(GL_COLOR_BUFFER_BIT);
-                        
-            gl!(gl.uniform_4f(location, red, green, blue, 0.9f32));
-            gl!(gl.draw_elements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0 as *mut c_void));
-
             if red > 0.9 || red < 0.1 {
                 red_increment *= -1.0f32; 
             }
-
+            red += red_increment;
+    
             if green > 0.7 || green < 0.3 {
                 green_increment *= -1.0f32;
             }
-
+            green += green_increment;
+    
             if blue > 0.95 || blue < 0.05 {
                 blue_increment *= -1.0f32;
             }
-
-            red += red_increment;
-            green += green_increment;
             blue += blue_increment;
+
+
+            gl!(gl.clear(GL_COLOR_BUFFER_BIT));
+                        
+            gl!(gl.use_program(shader));
+            gl!(gl.uniform_4f(location, red, green, blue, 0.9f32));
+            
+            gl!(gl.bind_vertex_array(vao));
+
+            gl!(gl.draw_elements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0 as *mut c_void));
+
 
             glfwSwapBuffers(window);
             
             glfwPollEvents();
         }
         
-        gl.delete_program(shader);
+        gl!(gl.delete_program(shader));
         glfwTerminate();
-    }
-}
-
-#[cfg(debug_assertions)]
-unsafe fn gl_clear_errors() {
-    loop {
-        if glGetError() == GL_NO_ERROR {
-            return
-        }
-    }
-}
-
-#[cfg(debug_assertions)]
-unsafe fn gl_print_errors(file: &str, line: u32) {
-    loop {
-        let error = glGetError();
-        match error {
-            GL_NO_ERROR => return,
-            GL_INVALID_ENUM      => println!("OpenGL-Error: Invalid enum.      ({}:{})", file, line),
-            GL_INVALID_VALUE     => println!("OpenGL-Error: Invalid value.     ({}:{})", file, line),
-            GL_INVALID_OPERATION => println!("OpenGL-Error: Invalid operation. ({}:{})", file, line),
-            GL_OUT_OF_MEMORY     => println!("OpenGL-Error: Out of memory.     ({}:{})", file, line),
-            _ => println!("OpenGL-Error: {:?}. ({}:{})", error, file, line)
-        };
-        
-        if error == GL_NO_ERROR {
-            return;
-        }
     }
 }
 
@@ -225,17 +181,14 @@ enum ShaderType {
 
 fn read_shaders_from_file() -> (CString, CString) {
     
-    use ShaderType::*;
-
-    let (mut vertex_shader, mut fragment_shader) = (String::new(), String::new());
-    
     let shader_file_name: &str = "./src/library/opengl/simple.shader";
     let mut file = File::open(shader_file_name).expect(format!("Couldn't read shader file {}", shader_file_name).as_str());
-    
     let mut contents = String::new();
     file.read_to_string(&mut contents).expect(format!("Couldn't read contents of file {}", shader_file_name).as_str());
     let lines: Vec<&str> = contents.split("\n").collect(); 
     
+    let (mut vertex_shader, mut fragment_shader) = (String::new(), String::new());
+    use ShaderType::*;
     let mut mode: ShaderType = None;
 
     for line in lines {
