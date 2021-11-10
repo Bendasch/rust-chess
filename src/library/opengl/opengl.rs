@@ -185,7 +185,8 @@ bind!{
         glGetStringi:fn(name: GLenum, index: GLuint) -> *const GLubyte,
         glGenVertexArrays: fn(n: GLsizei, arrays: *const GLuint),
         glBindVertexArray: fn(array: GLuint),
-        glDeleteBuffers: fn(n: GLsizei, buffers: *const GLuint)  
+        glDeleteBuffers: fn(n: GLsizei, buffers: *const GLuint),
+        glDeleteVertexArrays: fn(n: GLsizei, arrays: *const GLuint)
     }
 }
 
@@ -231,4 +232,5 @@ impl GL {
     map_func_modern!{gen_vertex_arrays, glGenVertexArrays: fn(n: GLsizei, arrays: *const GLuint)}
     map_func_modern!{bind_vertex_array, glBindVertexArray: fn(array: GLuint)}
     map_func_modern!{delete_buffers, glDeleteBuffers: fn(n: GLsizei, buffers: *const GLuint)}  
+    map_func_modern!{delete_vertex_arrays, glDeleteVertexArrays: fn(n: GLsizei, arrays: *const GLuint)}  
 }

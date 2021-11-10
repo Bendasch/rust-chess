@@ -3,6 +3,9 @@ use crate::library::opengl::renderer::*;
 use crate::library::glfw::*;
 use crate::library::opengl::opengl::*;
 use crate::library::opengl::vertex_buffer::*;
+use crate::library::opengl::index_buffer::*;
+use crate::library::opengl::vertex_array::*;
+use crate::library::opengl::vertex_buffer_layout::*;
 use std::ffi::{CString, CStr};
 use std::ptr::{null_mut};
 use std::mem::size_of;
@@ -85,40 +88,28 @@ pub unsafe fn run() {
     
     //print_opengl_version(&gl);
     //print_opengl_extensions(&gl);
-    
+
     let positions: [c_float; 8] = [
         -0.5,  -0.5, 
-            0.5,  -0.5, 
-            0.5,   0.5,
+        0.5,  -0.5, 
+        0.5,   0.5,
         -0.5,   0.5,
     ];
 
-    /*
-    let mut buffer: c_uint = 0;
-    gl!(gl.gen_buffers(1, &mut buffer));
-    gl!(gl.bind_buffer(GL_ARRAY_BUFFER, buffer));
-    gl!(gl.buffer_data(GL_ARRAY_BUFFER, (4 * 2 * size_of::<c_float>()) as GLsizeiptr, positions.as_ptr() as *const c_void, GL_STATIC_DRAW));
-    */
-
     let vertex_buffer = VertexBuffer::new(positions.as_ptr() as *const c_void, (8 * size_of::<c_float>()) as i32, &gl);
+    
+    let mut vertex_array = VertexArray::new(&gl);
+    let mut layout = VertexBufferLayout::new();
+    layout.push::<f32>(2);
+    vertex_array.add_buffer(&vertex_buffer, &layout);
 
     let indices: [c_uint; 6] = [
         0, 1, 2,
         2, 3, 0
     ];
-        
-    let mut vao: c_uint = 0;
-    gl!(gl.gen_vertex_arrays(1, &mut vao));
-    gl!(gl.bind_vertex_array(vao));
-
-    let mut ibo: c_uint = 0;
-    gl!(gl.gen_buffers(1, &mut ibo));
-    gl!(gl.bind_buffer(GL_ELEMENT_ARRAY_BUFFER, ibo));
-    gl!(gl.buffer_data(GL_ELEMENT_ARRAY_BUFFER, (2 * 3 * size_of::<c_uint>()) as GLsizeiptr, indices.as_ptr() as *const c_void, GL_STATIC_DRAW));
     
-    gl!(gl.enable_vertex_attrib_array(0));
-    gl!(gl.vertex_attrib_pointer(0, 2, GL_FLOAT, GL_FALSE, 2 * size_of::<c_float>() as i32, 0 as *mut c_void));
-
+    let index_buffer = IndexBuffer::new(indices.as_ptr() as *const c_void, 6, &gl);
+    
     let (vertex_shader, fragment_shader) = read_shaders_from_file();
     let shader: GLuint = create_shader(vertex_shader, fragment_shader, &gl);
     gl!(gl.use_program(shader));       
@@ -161,7 +152,7 @@ pub unsafe fn run() {
         gl!(gl.use_program(shader));
         gl!(gl.uniform_4f(location, red, green, blue, 0.9f32));
         
-        gl!(gl.bind_vertex_array(vao));
+        vertex_array.bind();
 
         gl!(gl.draw_elements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0 as *mut c_void));
 
@@ -172,8 +163,10 @@ pub unsafe fn run() {
     }
     
     gl!(gl.delete_program(shader));
-    glfwTerminate();
     drop(vertex_buffer);
+    drop(index_buffer);
+    
+    glfwTerminate();
 }
 
 enum ShaderType {
