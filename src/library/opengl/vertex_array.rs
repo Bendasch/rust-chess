@@ -1,6 +1,6 @@
 use crate::gl;
+use crate::library::opengl::utils::*;
 use crate::library::opengl::opengl::*;
-use crate::library::opengl::renderer::*;
 use crate::library::opengl::vertex_buffer::*;
 use crate::library::opengl::vertex_buffer_layout::*;
 use libc::{c_uint, c_void};

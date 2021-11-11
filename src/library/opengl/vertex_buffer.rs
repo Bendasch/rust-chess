@@ -1,6 +1,6 @@
 use crate::gl;
 use crate::library::opengl::opengl::*;
-use crate::library::opengl::renderer::*;
+use crate::library::opengl::utils::*;
 use libc::{c_void, c_uint};
 
 pub struct VertexBuffer<'a> {

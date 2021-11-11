@@ -5,3 +5,6 @@ pub mod vertex_buffer;
 pub mod index_buffer;
 pub mod vertex_array;
 pub mod vertex_buffer_layout;
+pub mod shader;
+pub mod utils;
+pub mod texture;

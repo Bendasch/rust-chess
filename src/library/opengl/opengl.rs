@@ -137,10 +137,49 @@ pub const GL_COMPILE_STATUS: GLenum = 0x8B81;
 pub const GL_LINK_STATUS: GLenum = 0x8B82;
 pub const GL_VALIDATE_STATUS: GLenum = 0x8B83;
 pub const GL_INFO_LOG_LENGTH: GLenum = 0x8B84;
+pub const GL_TEXTURE_1D: GLenum = 0x0DE0;
+pub const GL_TEXTURE_2D: GLenum = 0x0DE1;
+pub const GL_TEXTURE_WIDTH: GLenum = 0x1000;
+pub const GL_TEXTURE_HEIGHT: GLenum = 0x1001;
+pub const GL_TEXTURE_BORDER_COLOR: GLenum = 0x1004;
+pub const GL_TEXTURE_MAG_FILTER: GLenum = 0x2800;
+pub const GL_TEXTURE_MIN_FILTER: GLenum = 0x2801;
+pub const GL_TEXTURE_WRAP_S: GLenum = 0x2802;
+pub const GL_TEXTURE_WRAP_T: GLenum = 0x2803;
+pub const GL_NEAREST: GLenum = 0x2600;
+pub const GL_LINEAR: GLenum = 0x2601;
+pub const GL_NEAREST_MIPMAP_NEAREST: GLenum = 0x2700;
+pub const GL_LINEAR_MIPMAP_NEAREST: GLenum = 0x2701;
+pub const GL_NEAREST_MIPMAP_LINEAR: GLenum = 0x2702;
+pub const GL_LINEAR_MIPMAP_LINEAR: GLenum = 0x2703;
+pub const GL_CLAMP_TO_BORDER: GLenum = 0x812D;
+pub const GL_CLAMP_TO_EDGE: GLenum = 0x812F;
+pub const GL_TEXTURE_MIN_LOD: GLenum = 0x813A;
+pub const GL_TEXTURE_MAX_LOD: GLenum = 0x813B;
+pub const GL_TEXTURE_BASE_LEVEL: GLenum = 0x813C;
+pub const GL_TEXTURE_MAX_LEVEL: GLenum = 0x813D;
+pub const GL_RED: GLenum = 0x1903;
+pub const GL_GREEN: GLenum = 0x1904;
+pub const GL_BLUE: GLenum = 0x1905;
+pub const GL_ALPHA: GLenum = 0x1906;
+pub const GL_RGB: GLenum = 0x1907;
+pub const GL_RGBA: GLenum = 0x1908;
+pub const GL_RGB8: GLenum = 0x8051;
+pub const GL_RGB10: GLenum = 0x8052;
+pub const GL_RGB12: GLenum = 0x8053;
+pub const GL_RGB16: GLenum = 0x8054;
+pub const GL_RGBA2: GLenum = 0x8055;
+pub const GL_RGBA4: GLenum = 0x8056;
+pub const GL_RGB5_A1: GLenum = 0x8057;
+pub const GL_RGBA8: GLenum = 0x8058;
+pub const GL_RGB10_A2: GLenum = 0x8059;
+pub const GL_RGBA12: GLenum = 0x805A;
+pub const GL_RGBA16: GLenum = 0x805B;
+
 
 /* 
     OPENGL LEGACY FUNCTION POINTERS
-    > linked statically to Opengl32.lib 
+    > linked to Opengl32.dll 
 */
 #[link(name = "Opengl32")]
 extern "C" {
@@ -186,7 +225,11 @@ bind!{
         glGenVertexArrays: fn(n: GLsizei, arrays: *const GLuint),
         glBindVertexArray: fn(array: GLuint),
         glDeleteBuffers: fn(n: GLsizei, buffers: *const GLuint),
-        glDeleteVertexArrays: fn(n: GLsizei, arrays: *const GLuint)
+        glDeleteVertexArrays: fn(n: GLsizei, arrays: *const GLuint),
+        glGenTextures: fn(n: GLsizei, textures: *const GLuint),
+        glBindTexture: fn(target: GLenum, texture: GLuint),
+        glTexParameteri: fn(target: GLenum, pname: GLenum, param: GLint),
+        glTexImage2D: fn(target: GLenum, level: GLint, internalformat: GLint, width: GLsizei, height: GLsizei, border: GLint, format: GLenum, _type: GLenum, data: *const c_void)
     }
 }
 
@@ -232,5 +275,9 @@ impl GL {
     map_func_modern!{gen_vertex_arrays, glGenVertexArrays: fn(n: GLsizei, arrays: *const GLuint)}
     map_func_modern!{bind_vertex_array, glBindVertexArray: fn(array: GLuint)}
     map_func_modern!{delete_buffers, glDeleteBuffers: fn(n: GLsizei, buffers: *const GLuint)}  
-    map_func_modern!{delete_vertex_arrays, glDeleteVertexArrays: fn(n: GLsizei, arrays: *const GLuint)}  
+    map_func_modern!{delete_vertex_arrays, glDeleteVertexArrays: fn(n: GLsizei, arrays: *const GLuint)}
+    map_func_modern!{gen_textures, glGenTextures: fn(n: GLsizei, textures: *const GLuint)}  
+    map_func_modern!{bind_texture, glBindTexture: fn(target: GLenum, texture: GLuint)}  
+    map_func_modern!{tex_parameter_i, glTexParameteri: fn(target: GLenum, pname: GLenum, param: GLint)}  
+    map_func_modern!{tex_image_2d, glTexImage2D: fn(target: GLenum, level: GLint, internalformat: GLint, width: GLsizei, height: GLsizei, border: GLint, format: GLenum, _type: GLenum, data: *const c_void)}  
 }
