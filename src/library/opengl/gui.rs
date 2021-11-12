@@ -40,12 +40,12 @@ pub unsafe fn run() {
     //print_opengl_version(&gl);
     //print_opengl_extensions(&gl);
 
-    let positions: [c_float; 16] = [
-        -0.5,  -0.5, 0.0, 0.0,
-        0.5,  -0.5, 1.0, 0.0,
-        0.5,   0.5, 1.0, 1.0,
-        -0.5,   0.5, 0.0, 1.0
-    ];
+    let positions: Vec<c_float> = Vec::from([
+        -0.5, -0.5, 0.0, 0.0,
+        0.5, -0.5, 1.0, 0.0,
+        0.45, 0.45, 0.95, 0.95,
+        -0.5, 0.5, 0.0, 1.0,
+    ]);
 
     let vertex_buffer = VertexBuffer::new(positions.as_ptr() as *const c_void, (positions.len() * size_of::<c_float>()) as i32, &gl);
     
@@ -55,12 +55,12 @@ pub unsafe fn run() {
     layout.push::<f32>(2);
     vertex_array.add_buffer(&vertex_buffer, &layout);
 
-    let indices: [c_uint; 6] = [
+    let indices: Vec<c_uint> = Vec::from([
         0, 1, 2,
-        2, 3, 0
-    ];
+        2, 3, 0,
+    ]);
 
-    let index_buffer = IndexBuffer::new(indices.as_ptr() as *const c_void, 6, &gl);
+    let index_buffer = IndexBuffer::new(indices.as_ptr() as *const c_void, indices.len() as i32, &gl);
     
     let mut shader = Shader::new(String::from("./src/library/opengl/simple.shader"), &gl);
     shader.bind();
