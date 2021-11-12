@@ -6,6 +6,7 @@ use crate::library::opengl::index_buffer::*;
 use crate::library::opengl::vertex_array::*;
 use crate::library::opengl::vertex_buffer_layout::*;
 use crate::library::opengl::shader::*;
+use crate::library::opengl::texture::*;
 use std::ffi::{CString};
 use std::ptr::{null_mut};
 use std::mem::size_of;
@@ -62,6 +63,8 @@ pub unsafe fn run() {
     
     let mut shader = Shader::new(String::from("./src/library/opengl/simple.shader"), &gl);
     
+    let texture = Texture::new("./res/partyinmytummy.png", &gl);
+
     vertex_array.unbind();
     vertex_buffer.unbind();    
     index_buffer.unbind();

@@ -175,6 +175,38 @@ pub const GL_RGBA8: GLenum = 0x8058;
 pub const GL_RGB10_A2: GLenum = 0x8059;
 pub const GL_RGBA12: GLenum = 0x805A;
 pub const GL_RGBA16: GLenum = 0x805B;
+pub const GL_TEXTURE0: GLenum = 0x84C0;
+pub const GL_TEXTURE1: GLenum = 0x84C1;
+pub const GL_TEXTURE2: GLenum = 0x84C2;
+pub const GL_TEXTURE3: GLenum = 0x84C3;
+pub const GL_TEXTURE4: GLenum = 0x84C4;
+pub const GL_TEXTURE5: GLenum = 0x84C5;
+pub const GL_TEXTURE6: GLenum = 0x84C6;
+pub const GL_TEXTURE7: GLenum = 0x84C7;
+pub const GL_TEXTURE8: GLenum = 0x84C8;
+pub const GL_TEXTURE9: GLenum = 0x84C9;
+pub const GL_TEXTURE10: GLenum = 0x84CA;
+pub const GL_TEXTURE11: GLenum = 0x84CB;
+pub const GL_TEXTURE12: GLenum = 0x84CC;
+pub const GL_TEXTURE13: GLenum = 0x84CD;
+pub const GL_TEXTURE14: GLenum = 0x84CE;
+pub const GL_TEXTURE15: GLenum = 0x84CF;
+pub const GL_TEXTURE16: GLenum = 0x84D0;
+pub const GL_TEXTURE17: GLenum = 0x84D1;
+pub const GL_TEXTURE18: GLenum = 0x84D2;
+pub const GL_TEXTURE19: GLenum = 0x84D3;
+pub const GL_TEXTURE20: GLenum = 0x84D4;
+pub const GL_TEXTURE21: GLenum = 0x84D5;
+pub const GL_TEXTURE22: GLenum = 0x84D6;
+pub const GL_TEXTURE23: GLenum = 0x84D7;
+pub const GL_TEXTURE24: GLenum = 0x84D8;
+pub const GL_TEXTURE25: GLenum = 0x84D9;
+pub const GL_TEXTURE26: GLenum = 0x84DA;
+pub const GL_TEXTURE27: GLenum = 0x84DB;
+pub const GL_TEXTURE28: GLenum = 0x84DC;
+pub const GL_TEXTURE29: GLenum = 0x84DD;
+pub const GL_TEXTURE30: GLenum = 0x84DE;
+pub const GL_TEXTURE31: GLenum = 0x84DF;
 
 
 /* 
@@ -192,6 +224,7 @@ extern "C" {
     pub fn glDrawArrays(mode: GLenum, first: GLint, count: GLsizei);
     pub fn glDrawElements(mode: GLenum, count: GLsizei, _type: GLenum, indices: *const c_void);
     pub fn glGetError() -> GLenum;
+    pub fn glTexParameteri(target: GLenum, pname: GLenum, param: GLint);
 }
 
 #[allow(non_snake_case)]
@@ -228,8 +261,10 @@ bind!{
         glDeleteVertexArrays: fn(n: GLsizei, arrays: *const GLuint),
         glGenTextures: fn(n: GLsizei, textures: *const GLuint),
         glBindTexture: fn(target: GLenum, texture: GLuint),
-        glTexParameteri: fn(target: GLenum, pname: GLenum, param: GLint),
-        glTexImage2D: fn(target: GLenum, level: GLint, internalformat: GLint, width: GLsizei, height: GLsizei, border: GLint, format: GLenum, _type: GLenum, data: *const c_void)
+        //glTexParameteri: fn(target: GLenum, pname: GLenum, param: GLint),
+        glTexImage2D: fn(target: GLenum, level: GLint, internalformat: GLint, width: GLsizei, height: GLsizei, border: GLint, format: GLenum, _type: GLenum, data: *const c_void),
+        glDeleteTextures: fn(n: GLsizei, textures: *const GLuint),
+        glActiveTexture: fn(textures: GLenum),
     }
 }
 
@@ -248,6 +283,7 @@ impl GL {
     map_func_legacy!{draw_elements, glDrawElements: fn(mode: GLenum, count: GLsizei, _type: GLenum, indices: *const GLvoid)}
     map_func_legacy!{draw_arrays, glDrawArrays: fn(mode: GLenum, first: GLint, count: GLsizei)}
     map_func_legacy!{get_error, glGetError: fn() -> GLenum}  
+    map_func_legacy!{tex_parameter_i, glTexParameteri: fn(target: GLenum, pname: GLenum, param: GLint)}  
     
     /*
         Modern functions    
@@ -278,6 +314,8 @@ impl GL {
     map_func_modern!{delete_vertex_arrays, glDeleteVertexArrays: fn(n: GLsizei, arrays: *const GLuint)}
     map_func_modern!{gen_textures, glGenTextures: fn(n: GLsizei, textures: *const GLuint)}  
     map_func_modern!{bind_texture, glBindTexture: fn(target: GLenum, texture: GLuint)}  
-    map_func_modern!{tex_parameter_i, glTexParameteri: fn(target: GLenum, pname: GLenum, param: GLint)}  
+    //map_func_modern!{tex_parameter_i, glTexParameteri: fn(target: GLenum, pname: GLenum, param: GLint)}  
     map_func_modern!{tex_image_2d, glTexImage2D: fn(target: GLenum, level: GLint, internalformat: GLint, width: GLsizei, height: GLsizei, border: GLint, format: GLenum, _type: GLenum, data: *const c_void)}  
+    map_func_modern!{delete_textures, glDeleteTextures: fn(n: GLsizei, textures: *const GLuint)}  
+    map_func_modern!{active_texture, glActiveTexture: fn(textures: GLenum)}  
 }
