@@ -4,7 +4,6 @@ use crate::library::opengl::utils::{gl_clear_errors, gl_print_errors};
 use image::*;
 use crate::library::opengl::opengl::*;
 use libc::{c_void};
-use std::any::type_name;
 
 pub struct Texture<'a> {
     gl: &'a GL,
@@ -13,10 +12,6 @@ pub struct Texture<'a> {
     img: RgbaImage,
     width: u32,
     height: u32
-}
-
-fn print_type_of<T>(_: &T) {
-    println!("{}", std::any::type_name::<T>())
 }
 
 impl<'a> Texture<'a> {
@@ -35,12 +30,16 @@ impl<'a> Texture<'a> {
         gl!(gl.tex_parameter_i(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE));
         gl!(gl.tex_parameter_i(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE));
         
-        println!("Hello1");
-        println!("{:?}", img.as_raw().as_ptr() as *const c_void);
-        println!("{:?}", print_type_of(img.as_raw()));
-        let raw = img.as_raw();
-        gl!(gl.tex_image_2d(GL_TEXTURE_2D, 0, GL_RGBA8, dim.0 as GLint, dim.1 as GLint, 0, GL_RGBA, GL_UNSIGNED_BYTE, img.as_raw().as_ptr() as *const c_void));
-        println!("Hello2");
+        let raw: &Vec<u8> = img.as_raw();
+        gl!(gl.tex_image_2d(GL_TEXTURE_2D, 0, GL_RGBA8, dim.0 as GLint, dim.1 as GLint, 0, GL_RGBA, GL_UNSIGNED_BYTE, raw.as_ptr() as *const c_void));
+        
+        /*
+        let data: [u8; 16] = [  105, 105, 105, 105,
+                                105, 105, 105, 105,
+                                105, 105, 105, 105,
+                                105, 105, 105, 105];
+        */
+        //gl!(gl.tex_image_2d(GL_TEXTURE_2D, 0, GL_RGBA8, 2, 2, 0, GL_RGBA, GL_UNSIGNED_BYTE, data.as_ptr() as *const c_void));
         
         gl!(gl.bind_texture(GL_TEXTURE_2D, 0));
         

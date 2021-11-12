@@ -207,7 +207,18 @@ pub const GL_TEXTURE28: GLenum = 0x84DC;
 pub const GL_TEXTURE29: GLenum = 0x84DD;
 pub const GL_TEXTURE30: GLenum = 0x84DE;
 pub const GL_TEXTURE31: GLenum = 0x84DF;
-
+pub const GL_SRC_COLOR: GLenum = 0x0300;
+pub const GL_ONE_MINUS_SRC_COLOR: GLenum = 0x0301;
+pub const GL_SRC_ALPHA: GLenum = 0x0302;
+pub const GL_ONE_MINUS_SRC_ALPHA: GLenum = 0x0303;
+pub const GL_DST_ALPHA: GLenum = 0x0304;
+pub const GL_ONE_MINUS_DST_ALPHA: GLenum = 0x0305;
+pub const GL_DST_COLOR: GLenum = 0x0306;
+pub const GL_ONE_MINUS_DST_COLOR: GLenum = 0x0307;
+pub const GL_SRC_ALPHA_SATURATE: GLenum = 0x0308;
+pub const GL_BLEND_DST: GLenum = 0x0BE0;
+pub const GL_BLEND_SRC: GLenum = 0x0BE1;
+pub const GL_BLEND: GLenum = 0x0BE2;
 
 /* 
     OPENGL LEGACY FUNCTION POINTERS
@@ -225,6 +236,12 @@ extern "C" {
     pub fn glDrawElements(mode: GLenum, count: GLsizei, _type: GLenum, indices: *const c_void);
     pub fn glGetError() -> GLenum;
     pub fn glTexParameteri(target: GLenum, pname: GLenum, param: GLint);
+    pub fn glGenTextures(n: GLsizei, textures: *const GLuint);
+    pub fn glBindTexture(target: GLenum, texture: GLuint);
+    pub fn glTexImage2D(target: GLenum, level: GLint, internalformat: GLint, width: GLsizei, height: GLsizei, border: GLint, format: GLenum, _type: GLenum, data: *const c_void);
+    pub fn glDeleteTextures(n: GLsizei, textures: *const GLuint);
+    pub fn glBlendFunc(sfactor: GLenum, dfactor: GLenum);
+    pub fn glEnable(cap: GLenum);
 }
 
 #[allow(non_snake_case)]
@@ -259,12 +276,14 @@ bind!{
         glBindVertexArray: fn(array: GLuint),
         glDeleteBuffers: fn(n: GLsizei, buffers: *const GLuint),
         glDeleteVertexArrays: fn(n: GLsizei, arrays: *const GLuint),
-        glGenTextures: fn(n: GLsizei, textures: *const GLuint),
-        glBindTexture: fn(target: GLenum, texture: GLuint),
+        //glGenTextures: fn(n: GLsizei, textures: *const GLuint),
+        //glBindTexture: fn(target: GLenum, texture: GLuint),
         //glTexParameteri: fn(target: GLenum, pname: GLenum, param: GLint),
-        glTexImage2D: fn(target: GLenum, level: GLint, internalformat: GLint, width: GLsizei, height: GLsizei, border: GLint, format: GLenum, _type: GLenum, data: *const c_void),
+        //glTexImage2D: fn(target: GLenum, level: GLint, internalformat: GLint, width: GLsizei, height: GLsizei, border: GLint, format: GLenum, _type: GLenum, data: *const c_void),
         glDeleteTextures: fn(n: GLsizei, textures: *const GLuint),
         glActiveTexture: fn(textures: GLenum),
+        glUniform1i: fn(location: GLint, v0: GLint),
+        //glBlendFunc: fn(sfactor: GLenum, dfactor: GLenum),
     }
 }
 
@@ -284,7 +303,14 @@ impl GL {
     map_func_legacy!{draw_arrays, glDrawArrays: fn(mode: GLenum, first: GLint, count: GLsizei)}
     map_func_legacy!{get_error, glGetError: fn() -> GLenum}  
     map_func_legacy!{tex_parameter_i, glTexParameteri: fn(target: GLenum, pname: GLenum, param: GLint)}  
+    map_func_legacy!{gen_textures, glGenTextures: fn(n: GLsizei, textures: *const GLuint)}  
+    map_func_legacy!{bind_texture, glBindTexture: fn(target: GLenum, texture: GLuint)}  
+    map_func_legacy!{tex_image_2d, glTexImage2D: fn(target: GLenum, level: GLint, internalformat: GLint, width: GLsizei, height: GLsizei, border: GLint, format: GLenum, _type: GLenum, data: *const c_void)}  
+    map_func_legacy!{delete_textures, glDeleteTextures: fn(n: GLsizei, textures: *const GLuint)}  
+    map_func_legacy!{blend_func, glBlendFunc: fn(sfactor: GLenum, dfactor: GLenum)}  
+    map_func_legacy!{enable, glEnable: fn(cap: GLenum)}  
     
+
     /*
         Modern functions    
     */
@@ -312,10 +338,12 @@ impl GL {
     map_func_modern!{bind_vertex_array, glBindVertexArray: fn(array: GLuint)}
     map_func_modern!{delete_buffers, glDeleteBuffers: fn(n: GLsizei, buffers: *const GLuint)}  
     map_func_modern!{delete_vertex_arrays, glDeleteVertexArrays: fn(n: GLsizei, arrays: *const GLuint)}
-    map_func_modern!{gen_textures, glGenTextures: fn(n: GLsizei, textures: *const GLuint)}  
-    map_func_modern!{bind_texture, glBindTexture: fn(target: GLenum, texture: GLuint)}  
+    //map_func_modern!{gen_textures, glGenTextures: fn(n: GLsizei, textures: *const GLuint)}  
+    //map_func_modern!{bind_texture, glBindTexture: fn(target: GLenum, texture: GLuint)}  
     //map_func_modern!{tex_parameter_i, glTexParameteri: fn(target: GLenum, pname: GLenum, param: GLint)}  
-    map_func_modern!{tex_image_2d, glTexImage2D: fn(target: GLenum, level: GLint, internalformat: GLint, width: GLsizei, height: GLsizei, border: GLint, format: GLenum, _type: GLenum, data: *const c_void)}  
-    map_func_modern!{delete_textures, glDeleteTextures: fn(n: GLsizei, textures: *const GLuint)}  
+    //map_func_modern!{tex_image_2d, glTexImage2D: fn(target: GLenum, level: GLint, internalformat: GLint, width: GLsizei, height: GLsizei, border: GLint, format: GLenum, _type: GLenum, data: *const c_void)}  
+    //map_func_modern!{delete_textures, glDeleteTextures: fn(n: GLsizei, textures: *const GLuint)}  
     map_func_modern!{active_texture, glActiveTexture: fn(textures: GLenum)}  
+    map_func_modern!{uniform_1i, glUniform1i: fn(location: GLint, v0: GLint)}  
+    //map_func_modern!{blend_func, glBlendFunc: fn(sfactor: GLenum, dfactor: GLenum)}  
 }

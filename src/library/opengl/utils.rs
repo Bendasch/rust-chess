@@ -36,16 +36,12 @@ pub unsafe fn gl_print_errors(file: &str, line: u32) {
         let error = glGetError();
         match error {
             GL_NO_ERROR => return,
-            GL_INVALID_ENUM      => println!("OpenGL-Error: Invalid enum.      ({}:{})", file, line),
-            GL_INVALID_VALUE     => println!("OpenGL-Error: Invalid value.     ({}:{})", file, line),
-            GL_INVALID_OPERATION => println!("OpenGL-Error: Invalid operation. ({}:{})", file, line),
-            GL_OUT_OF_MEMORY     => println!("OpenGL-Error: Out of memory.     ({}:{})", file, line),
-            _ => println!("OpenGL-Error: {:?}. ({}:{})", error, file, line)
+            GL_INVALID_ENUM      => panic!("OpenGL-Error: Invalid enum.      ({}:{})", file, line),
+            GL_INVALID_VALUE     => panic!("OpenGL-Error: Invalid value.     ({}:{})", file, line),
+            GL_INVALID_OPERATION => panic!("OpenGL-Error: Invalid operation. ({}:{})", file, line),
+            GL_OUT_OF_MEMORY     => panic!("OpenGL-Error: Out of memory.     ({}:{})", file, line),
+            _ => panic!("OpenGL-Error: {:?}. ({}:{})", error, file, line)
         };
-        
-        if error == GL_NO_ERROR {
-            return;
-        }
     }
 }
 

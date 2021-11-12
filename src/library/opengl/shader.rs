@@ -27,7 +27,10 @@ impl<'a> Shader<'a> {
         let (vert_shader_str, frag_shader_str) = Shader::parse_file(file_path.as_str());
 
         gl!(let program = gl.create_program());    
-        
+        if program == 0 {
+            panic!("No program could be created");
+        }
+
         let vert_shader_id = Shader::compile(GL_VERTEX_SHADER, vert_shader_str, gl);
         let frag_shader_id = Shader::compile(GL_FRAGMENT_SHADER, frag_shader_str, gl);
 
@@ -128,13 +131,19 @@ impl<'a> Shader<'a> {
         let location = self.get_uniform_location(name);
         gl!(self.gl.uniform_4f(*location, v0, v1, v2, v3));
     }
+    
+    pub unsafe fn set_uniform_1i(&mut self, name: &str, v0: i32) {
+        self.cache_uniform_location(name);
+        let location = self.get_uniform_location(name);
+        gl!(self.gl.uniform_1i(*location, v0));
+    }
 
     unsafe fn cache_uniform_location(&mut self, name: &str) {
         if self.uniforms.contains_key(name) {
             return;
         }
-        let u_color = CString::new(name).unwrap();
-        gl!(let location = self.gl.get_uniform_location(self.shader_id, u_color.as_ptr() as *const GLchar));
+        let uniform = CString::new(name).unwrap();
+        gl!(let location = self.gl.get_uniform_location(self.shader_id, uniform.as_ptr() as *const GLchar));
         self.uniforms.insert(String::from(name), location);
     }
 

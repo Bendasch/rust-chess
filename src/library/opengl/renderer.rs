@@ -26,4 +26,9 @@ impl<'a> Renderer<'a> {
         vertex_array.bind();    
         gl!(self.gl.draw_elements(GL_TRIANGLES, *index_buffer.get_index_count(), GL_UNSIGNED_INT, 0 as *mut c_void));
     }
+
+    pub unsafe fn set_blend_func(&self) {
+        gl!(self.gl.blend_func(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
+        gl!(self.gl.enable(GL_BLEND));
+    }
 }
