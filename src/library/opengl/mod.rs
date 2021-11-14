@@ -8,3 +8,4 @@ pub mod vertex_buffer_layout;
 pub mod shader;
 pub mod utils;
 pub mod texture;
+pub mod gl_maths;

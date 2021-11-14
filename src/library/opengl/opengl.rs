@@ -284,6 +284,7 @@ bind!{
         glActiveTexture: fn(textures: GLenum),
         glUniform1i: fn(location: GLint, v0: GLint),
         //glBlendFunc: fn(sfactor: GLenum, dfactor: GLenum),
+        glUniformMatrix4fv: fn(location: GLint, count: GLsizei, transpose: GLboolean, value: *const GLfloat)
     }
 }
 
@@ -346,4 +347,5 @@ impl GL {
     map_func_modern!{active_texture, glActiveTexture: fn(textures: GLenum)}  
     map_func_modern!{uniform_1i, glUniform1i: fn(location: GLint, v0: GLint)}  
     //map_func_modern!{blend_func, glBlendFunc: fn(sfactor: GLenum, dfactor: GLenum)}  
+    map_func_modern!{uniform_matrix_4fv, glUniformMatrix4fv: fn(location: GLint, count: GLsizei, transpose: GLboolean, value: *const GLfloat)}  
 }

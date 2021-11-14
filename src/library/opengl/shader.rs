@@ -7,6 +7,7 @@ use std::fs::File;
 use std::io::Read;
 use libc::{c_uint, c_char};
 use std::collections::HashMap;
+use crate::library::opengl::gl_maths::Mat4;
 
 pub struct Shader<'a> {
     gl: &'a GL,
@@ -136,6 +137,12 @@ impl<'a> Shader<'a> {
         self.cache_uniform_location(name);
         let location = self.get_uniform_location(name);
         gl!(self.gl.uniform_1i(*location, v0));
+    }
+    
+    pub unsafe fn set_uniform_mat4f(&mut self, name: &str, mat: Mat4) {
+        self.cache_uniform_location(name);
+        let location = self.get_uniform_location(name);
+        gl!(self.gl.uniform_matrix_4fv(*location, 1, GL_FALSE, &mat.c0[0] as *const GLfloat));
     }
 
     unsafe fn cache_uniform_location(&mut self, name: &str) {

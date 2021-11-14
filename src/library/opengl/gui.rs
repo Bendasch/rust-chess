@@ -7,13 +7,17 @@ use crate::library::opengl::vertex_array::*;
 use crate::library::opengl::vertex_buffer_layout::*;
 use crate::library::opengl::shader::*;
 use crate::library::opengl::texture::*;
+use crate::library::opengl::gl_maths::*;
 use std::ffi::{CString};
 use std::ptr::{null_mut};
 use std::mem::size_of;
 use libc::{c_uint, c_float, c_void};
 
+static WIDTH: f32 = 1024.0;
+static HEIGHT: f32 = 768.0;
+
 pub unsafe fn run() {
-    
+
     let window: *mut GLFWwindow;
     let monitor: *mut GLFWmonitor = null_mut();
     let share: *mut GLFWwindow = null_mut();
@@ -24,7 +28,7 @@ pub unsafe fn run() {
     
     let title = CString::new("Rust chess (OpenGL)").unwrap();
     
-    window = glfwCreateWindow(640, 480, title.as_ptr(), monitor, share);
+    window = glfwCreateWindow(WIDTH as i32, HEIGHT as i32, title.as_ptr(), monitor, share);
     if window.is_null() {
         glfwTerminate();
         return;
@@ -41,10 +45,10 @@ pub unsafe fn run() {
     //print_opengl_extensions(&gl);
 
     let positions: Vec<c_float> = Vec::from([
-        -0.5, -0.5, 0.0, 0.0,
-        0.5, -0.5, 1.0, 0.0,
-        0.45, 0.45, 0.95, 0.95,
-        -0.5, 0.5, 0.0, 1.0,
+        0.0, 0.0,       0.0, 0.0,
+        WIDTH, 0.0,     1.0, 0.0,
+        WIDTH, HEIGHT,   1.0, 1.0,
+        0.0, HEIGHT,     0.0, 1.0,
     ]);
 
     let vertex_buffer = VertexBuffer::new(positions.as_ptr() as *const c_void, (positions.len() * size_of::<c_float>()) as i32, &gl);
@@ -62,8 +66,13 @@ pub unsafe fn run() {
 
     let index_buffer = IndexBuffer::new(indices.as_ptr() as *const c_void, indices.len() as i32, &gl);
     
+    let proj = ortho(0.0, WIDTH, 0.0, HEIGHT, -0.5, 0.5);
+    let view = translate(0.0, 0.0, 0.0) * rotate_z(1.0);
+    let mvp = proj * view;
+
     let mut shader = Shader::new(String::from("./src/library/opengl/simple.shader"), &gl);
     shader.bind();
+    shader.set_uniform_mat4f("u_MVP", mvp);
     
     let texture = Texture::new("./res/partyinmytummy.png", &gl);
     texture.bind(0);
@@ -79,7 +88,7 @@ pub unsafe fn run() {
     while glfwWindowShouldClose(window) == 0 {
 
         renderer.clear();       
-
+        
         renderer.draw(&vertex_array, &index_buffer, &shader);
 
         glfwSwapBuffers(window);
