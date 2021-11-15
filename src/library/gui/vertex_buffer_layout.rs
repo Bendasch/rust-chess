@@ -1,4 +1,4 @@
-use crate::library::opengl::opengl::*;
+use crate::library::gui::opengl::*;
 use std::mem::size_of;
 use std::any::TypeId;
 

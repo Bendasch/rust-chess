@@ -1,5 +1,17 @@
+pub mod opengl;
+pub mod renderer;
+pub mod vertex_buffer;
+pub mod index_buffer;
+pub mod vertex_array;
+pub mod vertex_buffer_layout;
+pub mod shader;
+pub mod utils;
+pub mod texture;
+pub mod gl_maths;
+
+
 use crate::library::glfw::*;
-use crate::library::opengl::{
+use crate::library::gui::{
     renderer::*,
     vertex_buffer::*,
     index_buffer::*,
@@ -9,9 +21,7 @@ use crate::library::opengl::{
     texture::*,
     gl_maths::*,
 };
-use std::{
-    mem::size_of,
-};
+use std::mem::size_of;
 use libc::{c_uint, c_float, c_void};
 
 

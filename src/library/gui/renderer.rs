@@ -1,6 +1,6 @@
 use crate::gl;
 use crate::library::glfw::*;
-use crate::library::opengl::{
+use crate::library::gui::{
     opengl::*,
     index_buffer::*,
     vertex_array::*,

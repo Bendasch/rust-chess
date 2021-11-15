@@ -1,8 +1,8 @@
 extern crate image;
 use crate::gl;
-use crate::library::opengl::utils::{gl_clear_errors, gl_print_errors};
+use crate::library::gui::utils::{gl_clear_errors, gl_print_errors};
 use image::*;
-use crate::library::opengl::opengl::*;
+use crate::library::gui::opengl::*;
 use libc::{c_void};
 
 pub struct Texture<'a> {

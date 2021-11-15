@@ -1,4 +1,4 @@
-use crate::library::opengl::opengl::*;
+use crate::library::gui::opengl::*;
 use std::ffi::{CStr};
 
 #[cfg(debug_assertions)]

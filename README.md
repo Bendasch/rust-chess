@@ -6,7 +6,6 @@
 * AI making legal moves
 * Add how to play
 * Save / export (FEN) positions
-* GUI in Vulkan
 
 # Done
 - [x] Added MIT license

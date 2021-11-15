@@ -1,13 +1,13 @@
 use crate::gl;
-use crate::library::opengl::opengl::*;
-use crate::library::opengl::utils::*;
+use crate::library::gui::opengl::*;
+use crate::library::gui::utils::*;
 use std::ffi::{CString, CStr};
 use std::ptr::{null_mut};
 use std::fs::File;
 use std::io::Read;
 use libc::{c_uint, c_char};
 use std::collections::HashMap;
-use crate::library::opengl::gl_maths::Mat4;
+use crate::library::gui::gl_maths::Mat4;
 
 pub struct Shader<'a> {
     gl: &'a GL,
