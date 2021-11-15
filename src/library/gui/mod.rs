@@ -1,3 +1,4 @@
+pub mod glfw;
 pub mod opengl;
 pub mod renderer;
 pub mod vertex_buffer;
@@ -9,9 +10,8 @@ pub mod utils;
 pub mod texture;
 pub mod gl_maths;
 
-
-use crate::library::glfw::*;
 use crate::library::gui::{
+    glfw::*,
     renderer::*,
     vertex_buffer::*,
     index_buffer::*,
@@ -57,10 +57,10 @@ pub unsafe fn run() {
 
     let index_buffer = IndexBuffer::new(indices.as_ptr() as *const c_void, indices.len() as i32, &renderer.gl);
     
-    let mut shader = Shader::new(String::from("./src/library/opengl/simple.shader"), &renderer.gl);
+    let mut shader = Shader::new(String::from("./src/library/gui/simple.shader"), &renderer.gl);
     shader.bind();
     
-    let texture = Texture::new("./res/partyinmytummy.png", &renderer.gl);
+    let texture = Texture::new("./src/library/gui/res/partyinmytummy.png", &renderer.gl);
     texture.bind(0);
     renderer.set_blend_func();
     
