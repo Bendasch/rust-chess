@@ -1,7 +1,6 @@
 use crate::library::glfw::*;
 use crate::library::opengl::{
     renderer::*,
-    opengl::*,
     vertex_buffer::*,
     index_buffer::*,
     vertex_array::*,
@@ -11,42 +10,20 @@ use crate::library::opengl::{
     gl_maths::*,
 };
 use std::{
-    ffi::{CString},
-    ptr::{null_mut},
     mem::size_of,
 };
 use libc::{c_uint, c_float, c_void};
 
-static WIDTH: f32 = 1024.0;
-static HEIGHT: f32 = 768.0;
 
 pub unsafe fn run() {
 
-    let window: *mut GLFWwindow;
-    let monitor: *mut GLFWmonitor = null_mut();
-    let share: *mut GLFWwindow = null_mut();
-    
-    if glfwInit() == 0 {
-        return;
-    }
-    
-    let title = CString::new("Rust chess (OpenGL)").unwrap();
-    
-    window = glfwCreateWindow(WIDTH as i32, HEIGHT as i32, title.as_ptr(), monitor, share);
-    if window.is_null() {
-        glfwTerminate();
-        return;
-    }
-    
-    glfwMakeContextCurrent(window);
+    // initialize glfw context
+    // create a window
+    // load the opengl function pointers
+    let renderer = Renderer::new();
 
-    let gl: GL = GL::bind();
-    let renderer = Renderer::new(&gl);
-
-    glfwSwapInterval(1);
-    
-    //print_opengl_version(&gl);
-    //print_opengl_extensions(&gl);
+    //print_opengl_version(&renderer.gl);
+    //print_opengl_extensions(&renderer.gl);
 
     let positions: Vec<c_float> = Vec::from([
         0.0, 0.0,       0.0, 0.0,
@@ -55,9 +32,9 @@ pub unsafe fn run() {
         0.0, HEIGHT,     0.0, 1.0,
     ]);
 
-    let vertex_buffer = VertexBuffer::new(positions.as_ptr() as *const c_void, (positions.len() * size_of::<c_float>()) as i32, &gl);
+    let vertex_buffer = VertexBuffer::new(positions.as_ptr() as *const c_void, (positions.len() * size_of::<c_float>()) as i32, &renderer.gl);
     
-    let mut vertex_array = VertexArray::new(&gl);
+    let mut vertex_array = VertexArray::new(&renderer.gl);
     let mut layout = VertexBufferLayout::new();
     layout.push::<f32>(2);
     layout.push::<f32>(2);
@@ -68,12 +45,12 @@ pub unsafe fn run() {
         2, 3, 0,
     ]);
 
-    let index_buffer = IndexBuffer::new(indices.as_ptr() as *const c_void, indices.len() as i32, &gl);
+    let index_buffer = IndexBuffer::new(indices.as_ptr() as *const c_void, indices.len() as i32, &renderer.gl);
     
-    let mut shader = Shader::new(String::from("./src/library/opengl/simple.shader"), &gl);
+    let mut shader = Shader::new(String::from("./src/library/opengl/simple.shader"), &renderer.gl);
     shader.bind();
     
-    let texture = Texture::new("./res/partyinmytummy.png", &gl);
+    let texture = Texture::new("./res/partyinmytummy.png", &renderer.gl);
     texture.bind(0);
     renderer.set_blend_func();
     
@@ -88,7 +65,7 @@ pub unsafe fn run() {
     let view = translate(0.0, 0.0, 0.0);
     let mut model: Mat4;
     
-    while glfwWindowShouldClose(window) == 0 {
+    while glfwWindowShouldClose(renderer.window) == 0 {
         
         renderer.clear();       
         
@@ -108,7 +85,7 @@ pub unsafe fn run() {
             renderer.draw(&vertex_array, &index_buffer, &shader);
         }
 
-        glfwSwapBuffers(window);
+        glfwSwapBuffers(renderer.window);
         
         glfwPollEvents();
     }

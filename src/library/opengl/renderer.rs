@@ -1,19 +1,52 @@
 use crate::gl;
-use crate::library::opengl::opengl::*;
-use crate::library::opengl::utils::*;
-use crate::library::opengl::vertex_array::*;
-use crate::library::opengl::index_buffer::*;
-use crate::library::opengl::shader::*;
+use crate::library::glfw::*;
+use crate::library::opengl::{
+    opengl::*,
+    index_buffer::*,
+    vertex_array::*,
+    shader::*,
+    utils::*,
+};
+use std::{
+    ffi::{CString},
+    ptr::{null_mut},
+};
 use libc::{c_void};
 
-pub struct Renderer<'a> {
-    gl: &'a GL
+pub static WIDTH: f32 = 1024.0;
+pub static HEIGHT: f32 = 768.0;
+
+pub struct Renderer{
+    pub gl: GL,
+    pub window: *mut GLFWwindow
 }
 
-impl<'a> Renderer<'a> {
+impl Renderer{
     
-    pub fn new(gl: &'a GL) -> Renderer {
-        Renderer { gl }
+    pub unsafe fn new() -> Renderer {
+        
+        let window: *mut GLFWwindow;
+        let monitor: *mut GLFWmonitor = null_mut();
+        let share: *mut GLFWwindow = null_mut();
+        
+        if glfwInit() == 0 {
+            panic!("Failed to initialize GLFW!");
+        }
+        
+        let title = CString::new("Rust chess (OpenGL)").unwrap();
+        
+        window = glfwCreateWindow(WIDTH as i32, HEIGHT as i32, title.as_ptr(), monitor, share);
+        if window.is_null() {
+            glfwTerminate();
+            panic!("Failed to create GLFW window!");
+        }
+        
+        glfwMakeContextCurrent(window);
+
+        let gl: GL = GL::bind();
+
+        glfwSwapInterval(1);
+        Renderer { gl, window }
     }
 
     pub unsafe fn clear(&self) {
