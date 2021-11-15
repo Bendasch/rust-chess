@@ -29,11 +29,16 @@ pub fn rotate_x(theta: f32) -> glm::Mat4 {
     )    
 }
 
-pub fn rotate_z(theta: f32) -> glm::Mat4 {
+pub fn rotate_z(alpha: f32) -> glm::Mat4 {
+    let theta = deg_to_radians(alpha);
     glm::mat4(
         theta.cos(), theta.sin(), 0.0, 0.0,
         -theta.sin(), theta.cos(), 0.0, 0.0, 
         0.0, 0.0, 1.0, 0.0,
         0.0, 0.0, 0.0, 1.0
     )    
+}
+
+fn deg_to_radians(deg: f32) -> f32 {
+    deg * std::f32::consts::PI / 180.0 
 }

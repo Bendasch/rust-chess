@@ -244,7 +244,6 @@ extern "C" {
     pub fn glEnable(cap: GLenum);
 }
 
-#[allow(non_snake_case)]
 bind!{
     pub struct GL {
 

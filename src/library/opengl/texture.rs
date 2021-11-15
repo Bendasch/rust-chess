@@ -32,15 +32,7 @@ impl<'a> Texture<'a> {
         
         let raw: &Vec<u8> = img.as_raw();
         gl!(gl.tex_image_2d(GL_TEXTURE_2D, 0, GL_RGBA8, dim.0 as GLint, dim.1 as GLint, 0, GL_RGBA, GL_UNSIGNED_BYTE, raw.as_ptr() as *const c_void));
-        
-        /*
-        let data: [u8; 16] = [  105, 105, 105, 105,
-                                105, 105, 105, 105,
-                                105, 105, 105, 105,
-                                105, 105, 105, 105];
-        */
-        //gl!(gl.tex_image_2d(GL_TEXTURE_2D, 0, GL_RGBA8, 2, 2, 0, GL_RGBA, GL_UNSIGNED_BYTE, data.as_ptr() as *const c_void));
-        
+    
         gl!(gl.bind_texture(GL_TEXTURE_2D, 0));
         
         Texture {
