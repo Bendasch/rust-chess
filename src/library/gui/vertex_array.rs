@@ -25,7 +25,7 @@ impl<'a, 'b> VertexArray {
         let elements = layout.elements();
         let mut offset: u32 = 0;
         for (i, element) in elements.iter().enumerate() {
-            gl!(self.gl.enable_vertex_attrib_array(i as u32));
+            gl!(self.gl.enable_vertex_array_attrib(*layout.vb_id(), i as u32));
             gl!(self.gl.vertex_attrib_pointer(i as GLuint, element.count, element.gl_type, element.normalized, *layout.stride(), offset as *mut c_void));
             offset += element.count as u32 * element.size as u32;
         }

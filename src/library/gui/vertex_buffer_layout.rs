@@ -7,10 +7,11 @@ pub struct VertexBufferElement {
     pub gl_type: GLenum,
     pub count: GLint,
     pub normalized: GLboolean,
-    pub size: GLsizei
+    pub size: GLsizei,
 }
 
 pub struct VertexBufferLayout {
+    vertex_buffer_id: GLuint,
     elements: Vec<VertexBufferElement>,
     stride: GLsizei,
 }
@@ -18,8 +19,8 @@ pub struct VertexBufferLayout {
 
 impl<'b> VertexBufferLayout {
 
-    pub fn new() -> VertexBufferLayout { 
-        VertexBufferLayout {elements: Vec::new(), stride: 0}
+    pub fn new(vertex_buffer_id: GLuint) -> VertexBufferLayout { 
+        VertexBufferLayout {vertex_buffer_id, elements: Vec::new(), stride: 0}
     }
 
     pub fn elements(&self) -> &Vec<VertexBufferElement> {
@@ -30,6 +31,10 @@ impl<'b> VertexBufferLayout {
         &self.stride
     } 
 
+    pub fn vb_id(&self) -> &GLuint {
+        &self.vertex_buffer_id
+    }
+    
     pub fn push<T: 'static>(&mut self, count: GLint) {
 
         let size = size_of::<T>() as GLsizei;

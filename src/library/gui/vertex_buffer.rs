@@ -6,7 +6,7 @@ use std::rc::Rc;
 
 pub struct VertexBuffer {
     gl: Rc<GL>,
-    buffer_id: c_uint,
+    pub buffer_id: c_uint,
 }
 
 impl VertexBuffer {
