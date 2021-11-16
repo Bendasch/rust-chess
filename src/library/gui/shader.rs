@@ -1,16 +1,19 @@
 use crate::gl;
 use crate::library::gui::opengl::*;
 use crate::library::gui::utils::*;
-use std::ffi::{CString, CStr};
-use std::ptr::{null_mut};
-use std::fs::File;
-use std::io::Read;
+use std::{
+    ffi::{CString, CStr},
+    ptr::{null_mut},
+    fs::File,
+    io::Read,
+    collections::HashMap,
+    rc::Rc,
+};
 use libc::{c_uint, c_char};
-use std::collections::HashMap;
 use crate::library::gui::gl_maths::Mat4;
 
-pub struct Shader<'a> {
-    gl: &'a GL,
+pub struct Shader {
+    gl: Rc<GL>,
     shader_id: c_uint,
     file_path: String,
     uniforms: HashMap<String, i32> 
@@ -21,9 +24,9 @@ enum ShaderType {
     Fragment
 }
 
-impl<'a> Shader<'a> {
+impl Shader {
 
-    pub unsafe fn new(file_path: String, gl: &'a GL) -> Shader<'a> {
+    pub unsafe fn new(file_path: String, gl: Rc<GL>) -> Shader {
 
         let (vert_shader_str, frag_shader_str) = Shader::parse_file(file_path.as_str());
 
@@ -32,8 +35,8 @@ impl<'a> Shader<'a> {
             panic!("No program could be created");
         }
 
-        let vert_shader_id = Shader::compile(GL_VERTEX_SHADER, vert_shader_str, gl);
-        let frag_shader_id = Shader::compile(GL_FRAGMENT_SHADER, frag_shader_str, gl);
+        let vert_shader_id = Shader::compile(GL_VERTEX_SHADER, vert_shader_str, &gl);
+        let frag_shader_id = Shader::compile(GL_FRAGMENT_SHADER, frag_shader_str, &gl);
 
         gl!(gl.attach_shader(program, vert_shader_id));   
         gl!(gl.attach_shader(program, frag_shader_id));   
@@ -62,7 +65,6 @@ impl<'a> Shader<'a> {
     pub unsafe fn unbind(&self) {
         gl!(self.gl.use_program(0));  
     }
-
 
     pub unsafe fn compile(gl_type: GLenum, source: CString, gl: &GL) -> GLuint {
         
@@ -160,7 +162,7 @@ impl<'a> Shader<'a> {
 
 }
 
-impl<'a> Drop for Shader<'a> { 
+impl Drop for Shader { 
     
     fn drop(&mut self) {
         unsafe{ 

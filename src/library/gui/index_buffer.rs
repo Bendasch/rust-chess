@@ -2,17 +2,20 @@ use crate::gl;
 use crate::library::gui::opengl::*;
 use crate::library::gui::utils::*;
 use libc::{c_void, c_uint};
-use std::mem::size_of;
+use std::{
+    mem::size_of,
+    rc::Rc,
+};
 
-pub struct IndexBuffer<'a> {
-    gl: &'a GL,
+pub struct IndexBuffer {
+    gl: Rc<GL>,
     buffer_id: c_uint,
     index_count: i32
 }
 
-impl<'a> IndexBuffer<'a> {
+impl IndexBuffer {
 
-    pub unsafe fn new(data_ptr: *const c_void, index_count: i32, gl: &'a GL) -> IndexBuffer {
+    pub unsafe fn new(data_ptr: *const c_void, index_count: i32, gl: Rc<GL>) -> IndexBuffer {
         
         let mut buffer_id: c_uint = 0;
         gl!(gl.gen_buffers(1, &mut buffer_id));
@@ -35,7 +38,7 @@ impl<'a> IndexBuffer<'a> {
     }
 }
 
-impl<'a> Drop for IndexBuffer<'a> {
+impl Drop for IndexBuffer {
     fn drop(&mut self) {
         self.gl.delete_buffers(1, &mut self.buffer_id);
     }

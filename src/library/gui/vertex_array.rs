@@ -4,15 +4,16 @@ use crate::library::gui::opengl::*;
 use crate::library::gui::vertex_buffer::*;
 use crate::library::gui::vertex_buffer_layout::*;
 use libc::{c_uint, c_void};
+use std::rc::Rc;
 
-pub struct VertexArray<'a> {
-    gl: &'a GL,
+pub struct VertexArray {
+    gl: Rc<GL>,
     array_id: c_uint, 
 }
 
-impl<'a, 'b> VertexArray<'a> {
+impl<'a, 'b> VertexArray {
 
-    pub unsafe fn new(gl: &'a GL) -> VertexArray<'a> {
+    pub unsafe fn new(gl: Rc<GL>) -> VertexArray {
         let mut id: c_uint = 0;
         gl!(gl.gen_vertex_arrays(1, &mut id));
         VertexArray { gl, array_id: id }
@@ -39,7 +40,7 @@ impl<'a, 'b> VertexArray<'a> {
     }
 }
 
-impl<'a> Drop for VertexArray<'a> {
+impl Drop for VertexArray {
     fn drop(&mut self) {
         self.gl.delete_vertex_arrays(1, &self.array_id);
     }

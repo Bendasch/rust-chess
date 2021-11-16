@@ -2,15 +2,16 @@ use crate::gl;
 use crate::library::gui::opengl::*;
 use crate::library::gui::utils::*;
 use libc::{c_void, c_uint};
+use std::rc::Rc;
 
-pub struct VertexBuffer<'a> {
-    gl: &'a GL,
+pub struct VertexBuffer {
+    gl: Rc<GL>,
     buffer_id: c_uint,
 }
 
-impl<'a> VertexBuffer<'a> {
+impl VertexBuffer {
 
-    pub unsafe fn new(data_ptr: *const c_void, data_size: i32, gl: &'a GL) -> VertexBuffer {
+    pub unsafe fn new(data_ptr: *const c_void, data_size: i32, gl: Rc<GL>) -> VertexBuffer {
         
         let mut buffer_id: c_uint = 0;
         gl!(gl.gen_buffers(1, &mut buffer_id));
@@ -29,7 +30,7 @@ impl<'a> VertexBuffer<'a> {
     }
 }
 
-impl<'a> Drop for VertexBuffer<'a> {
+impl Drop for VertexBuffer {
     fn drop(&mut self) {
         self.gl.delete_buffers(1, &mut self.buffer_id);
     }

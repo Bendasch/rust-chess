@@ -4,9 +4,10 @@ use crate::library::gui::utils::{gl_clear_errors, gl_print_errors};
 use image::*;
 use crate::library::gui::opengl::*;
 use libc::{c_void};
+use std::rc::Rc;
 
-pub struct Texture<'a> {
-    gl: &'a GL,
+pub struct Texture {
+    gl: Rc<GL>,
     texture_id: GLuint,
     file_path: String,
     img: RgbaImage,
@@ -14,9 +15,9 @@ pub struct Texture<'a> {
     height: u32
 }
 
-impl<'a> Texture<'a> {
+impl Texture {
 
-    pub unsafe fn new(file_path: &str, gl: &'a GL) -> Texture<'a> {
+    pub unsafe fn new(file_path: &str, gl: Rc<GL>) -> Texture {
         
         let img = image::open(file_path).unwrap().flipv().into_rgba8();
         let dim = img.dimensions();
@@ -71,7 +72,7 @@ impl<'a> Texture<'a> {
     }
 }
 
-impl<'a> Drop for Texture<'a> {
+impl Drop for Texture {
 
     fn drop(&mut self) {
         unsafe{
