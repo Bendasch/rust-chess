@@ -46,11 +46,13 @@ macro_rules! bind {
 
 macro_rules! map_func_modern {
     ($fn:ident, $glname:ident: fn($( $param:ident: $typ:ty ),*)) => {
+        #[inline(always)]
         pub fn $fn(&self, $( $param: $typ ),*) {
             (self.$glname)($( $param ),*);
         }
     };
     ($fn:ident, $glname:ident: fn($( $param:ident: $typ:ty ),*) $(-> $ret:ty)*) => {
+        #[inline(always)]
         pub fn $fn(&self, $( $param: $typ ),*) $(-> $ret)* {
             (self.$glname)($( $param ),*)
         }
@@ -59,11 +61,13 @@ macro_rules! map_func_modern {
 
 macro_rules! map_func_legacy {
     ($fn:ident, $glname:ident: fn($( $param:ident: $typ:ty ),*)) => {
+        #[inline(always)]
         pub unsafe fn $fn(&self, $( $param: $typ ),*) {
             $glname($( $param ),*);
         }
     };
     ($fn:ident, $glname:ident: fn($( $param:ident: $typ:ty ),*) $(-> $ret:ty)*) => {
+        #[inline(always)]
         pub unsafe fn $fn(&self, $( $param: $typ ),*) $(-> $ret)* {
             $glname($( $param ),*)
         }
