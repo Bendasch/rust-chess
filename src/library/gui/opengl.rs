@@ -289,6 +289,8 @@ bind!{
         //glBlendFunc: fn(sfactor: GLenum, dfactor: GLenum),
         glUniformMatrix4fv: fn(location: GLint, count: GLsizei, transpose: GLboolean, value: *const GLfloat),
         glEnableVertexArrayAttrib: fn(vaobj: GLuint, index: GLuint),
+        glBindTextureUnit: fn(unit: GLuint, texture: GLuint),
+        glUniform1iv: fn(location: GLint, count: GLsizei, value: *const GLint),
     }
 }
 
@@ -353,4 +355,6 @@ impl GL {
     //map_func_modern!{blend_func, glBlendFunc: fn(sfactor: GLenum, dfactor: GLenum)}  
     map_func_modern!{uniform_matrix_4fv, glUniformMatrix4fv: fn(location: GLint, count: GLsizei, transpose: GLboolean, value: *const GLfloat)}  
     map_func_modern!{enable_vertex_array_attrib, glEnableVertexArrayAttrib: fn(vaobj: GLuint, index: GLuint)}  
+    map_func_modern!{bind_texture_unit, glBindTextureUnit: fn(unit: GLuint, texture: GLuint)}  
+    map_func_modern!{uniform_1iv, glUniform1iv: fn(location: GLint, count: GLsizei, value: *const GLint)}  
 }

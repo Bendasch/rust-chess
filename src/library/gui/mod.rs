@@ -13,13 +13,14 @@ pub mod gl_maths;
 use crate::library::gui::{
     glfw::*,
     renderer::Renderer,
+    utils::print_opengl_version
 };
 
 pub unsafe fn run() {
 
     let mut renderer = Renderer::init();
 
-    //print_opengl_version(&renderer.gl);
+    print_opengl_version(&renderer.gl);
     //print_opengl_extensions(&renderer.gl);
 
     while glfwWindowShouldClose(renderer.window) == 0 {

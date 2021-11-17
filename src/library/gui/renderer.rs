@@ -9,7 +9,7 @@ use crate::library::gui::{
     shader::*,
     utils::*,
     gl_maths::*,
-    //texture::*
+    texture::*
 };
 use std::{
     ffi::{CString},
@@ -30,7 +30,7 @@ pub struct Renderer {
     vertex_array: VertexArray,
     vertex_buffer: VertexBuffer,
     index_buffer: IndexBuffer,
-    //texture: Texture
+    textures: Vec<Texture>
 }
 
 impl  Renderer {
@@ -70,15 +70,15 @@ impl  Renderer {
             3.0*WIDTH/4.0,  3.0*HEIGHT/4.0, 1.0, 1.0,
             WIDTH/2.0,      3.0*HEIGHT/4.0, 0.0, 1.0,
             */
-            WIDTH/4.0,      HEIGHT/4.0,     1.0, 0.76, 0.53, 1.0,
-            WIDTH/2.0,      HEIGHT/4.0,     1.0, 0.76, 0.53, 1.0,
-            WIDTH/2.0,      HEIGHT/2.0,     1.0, 0.76, 0.53, 1.0,
-            WIDTH/4.0,      HEIGHT/2.0,     1.0, 0.76, 0.53, 1.0,
-            
-            WIDTH/2.0,      HEIGHT/2.0,     0.5, 0.36, 0.73, 1.0,
-            3.0*WIDTH/4.0,  HEIGHT/2.0,     0.5, 0.36, 0.73, 1.0,
-            3.0*WIDTH/4.0,  3.0*HEIGHT/4.0, 0.5, 0.36, 0.73, 1.0,
-            WIDTH/2.0,      3.0*HEIGHT/4.0, 0.5, 0.36, 0.73, 1.0,
+            WIDTH/4.0,      HEIGHT/4.0,         1.0, 0.76, 0.53, 1.0,   0.0, 0.0,   0.0,
+            WIDTH/2.0,      HEIGHT/4.0,         1.0, 0.76, 0.53, 1.0,   1.0, 0.0,   0.0,
+            WIDTH/2.0,      HEIGHT/2.0,         1.0, 0.76, 0.53, 1.0,   1.0, 1.0,   0.0,
+            WIDTH/4.0,      HEIGHT/2.0,         1.0, 0.76, 0.53, 1.0,   0.0, 1.0,   0.0,
+
+            WIDTH/2.0,      HEIGHT/2.0,         0.5, 0.36, 0.73, 1.0,   0.0, 0.0,   1.0,
+            3.0*WIDTH/4.0,  HEIGHT/2.0,         0.5, 0.36, 0.73, 1.0,   1.0, 0.0,   1.0,
+            3.0*WIDTH/4.0,  3.0*HEIGHT/4.0,     0.5, 0.36, 0.73, 1.0,   1.0, 1.0,   1.0,
+            WIDTH/2.0,      3.0*HEIGHT/4.0,     0.5, 0.36, 0.73, 1.0,   0.0, 1.0,   1.0,
         ]);
     
         let vertex_buffer = VertexBuffer::new(positions.as_ptr() as *const c_void, (positions.len() * size_of::<c_float>()) as i32, Rc::clone(&gl));
@@ -87,6 +87,8 @@ impl  Renderer {
         let mut layout = VertexBufferLayout::new(vertex_buffer.buffer_id);
         layout.push::<f32>(2);
         layout.push::<f32>(4);
+        layout.push::<f32>(2);
+        layout.push::<f32>(1);
         vertex_array.add_buffer(&vertex_buffer, &layout);
     
         let indices: Vec<c_uint> = Vec::from([
@@ -99,15 +101,14 @@ impl  Renderer {
     
         let index_buffer = IndexBuffer::new(indices.as_ptr() as *const c_void, indices.len() as i32, Rc::clone(&gl));
         
-        let shader = Shader::new(String::from("./src/library/gui/simple.shader"), Rc::clone(&gl));
+        let mut shader = Shader::new(String::from("./src/library/gui/simple.shader"), Rc::clone(&gl));
         shader.bind();
+    
+        let tummy = Texture::new("./src/library/gui/res/img/partyinmytummy.png", Rc::clone(&gl));
+        let texture = Texture::new("./src/library/gui/res/img/texture.png", Rc::clone(&gl));
+        shader.set_uniform_1iv("u_Textures", vec![0, 1]);
         
-        /*
-        let texture = Texture::new("./src/library/gui/res/img/partyinmytummy.png", Rc::clone(&gl));
-        texture.bind(0);
         Renderer::set_blend_func(Rc::clone(&gl));
-        shader.set_uniform_1i("u_Texture", 0);
-        */
 
         vertex_array.unbind();
         vertex_buffer.unbind();    
@@ -121,7 +122,7 @@ impl  Renderer {
             vertex_buffer,
             index_buffer,
             shader, 
-            //exture
+            textures: vec![tummy, texture]
         }
     }
 
@@ -133,6 +134,10 @@ impl  Renderer {
         let mvp = ortho(0.0, WIDTH, 0.0, HEIGHT, -0.5, 0.5);
         self.shader.bind();
         self.shader.set_uniform_mat4f("u_MVP", mvp);
+        self.textures[0].bind_texture_unit(0);
+        self.textures[1].bind_texture_unit(1);
+        //self.textures[0].bind(0);
+        //self.textures[1].bind(1);
     }
 
     pub unsafe fn draw(&self) {

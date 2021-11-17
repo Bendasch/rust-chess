@@ -141,6 +141,12 @@ impl Shader {
         gl!(self.gl.uniform_1i(*location, v0));
     }
     
+    pub unsafe fn set_uniform_1iv(&mut self, name: &str, vec: Vec<GLint>) {
+        self.cache_uniform_location(name);
+        let location = self.get_uniform_location(name);
+        gl!(self.gl.uniform_1iv(*location, vec.len() as i32, &vec[0] as *const GLint));
+    }
+    
     pub unsafe fn set_uniform_mat4f(&mut self, name: &str, mat: Mat4) {
         self.cache_uniform_location(name);
         let location = self.get_uniform_location(name);

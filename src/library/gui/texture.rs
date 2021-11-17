@@ -34,7 +34,7 @@ impl Texture {
         let raw: &Vec<u8> = img.as_raw();
         gl!(gl.tex_image_2d(GL_TEXTURE_2D, 0, GL_RGBA8, dim.0 as GLint, dim.1 as GLint, 0, GL_RGBA, GL_UNSIGNED_BYTE, raw.as_ptr() as *const c_void));
     
-        gl!(gl.bind_texture(GL_TEXTURE_2D, 0));
+        //gl!(gl.bind_texture(GL_TEXTURE_2D, 0));
         
         Texture {
             gl,
@@ -44,6 +44,10 @@ impl Texture {
             width: dim.0,
             height: dim.1,
         }
+    }
+
+    pub fn get_texture_id(&self) -> GLuint {
+        self.texture_id
     }
 
     pub fn get_width(&self) -> &u32 {
@@ -69,6 +73,10 @@ impl Texture {
     
     pub unsafe fn unbind(&self) {
         gl!(self.gl.bind_texture(GL_TEXTURE_2D, 0));
+    }
+
+    pub unsafe fn bind_texture_unit(&self, unit: u32) {
+        gl!(self.gl.bind_texture_unit(unit, self.texture_id));
     }
 }
 
