@@ -1,3 +1,4 @@
+extern crate glm;
 use crate::library::gui::opengl::*;
 use std::mem::size_of;
 use std::any::TypeId;
@@ -53,5 +54,36 @@ impl<'b> VertexBufferLayout {
 
         self.elements.push(element);
         self.stride += count * size;
+    }
+}
+
+
+pub struct Position(pub f32, pub f32, pub f32);
+
+pub struct RGBA(pub f32, pub f32, pub f32, pub f32);
+
+pub struct TextureCoords(pub f32, pub f32);
+
+pub struct Vertex {
+    pub position: Position,
+    pub color: RGBA,
+    pub texture_coords: TextureCoords,
+    pub texture_id: f32,
+}
+
+impl Vertex {
+    pub fn deserialize(&mut self) -> Vec<f32> {
+        let mut vec = Vec::new();
+        vec.push(self.position.0);
+        vec.push(self.position.1);
+        vec.push(self.position.2);
+        vec.push(self.color.0);
+        vec.push(self.color.1);
+        vec.push(self.color.2);
+        vec.push(self.color.3);
+        vec.push(self.texture_coords.0);
+        vec.push(self.texture_coords.1);
+        vec.push(self.texture_id);
+        vec
     }
 }

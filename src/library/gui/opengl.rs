@@ -85,6 +85,7 @@ pub type GLbitfield = c_int;
 pub type GLubyte = c_uchar;
 pub type GLsizei = c_int;
 pub type GLsizeiptr = c_int; // not c_uchar!!
+pub type GLintptr = c_int; // not sure if this is correct..
 pub type GLvoid = c_void;
 pub type GLboolean = c_char;
 pub type GLchar = c_char;
@@ -291,6 +292,9 @@ bind!{
         glEnableVertexArrayAttrib: fn(vaobj: GLuint, index: GLuint),
         glBindTextureUnit: fn(unit: GLuint, texture: GLuint),
         glUniform1iv: fn(location: GLint, count: GLsizei, value: *const GLint),
+        glMapBuffer: fn(target: GLenum, access: GLenum),
+        glUnmapBuffer: fn(target: GLenum) -> GLboolean,
+        glBufferSubData: fn(target: GLenum, offset: GLintptr, size: GLsizeiptr, data: *const c_void),
     }
 }
 
@@ -357,4 +361,7 @@ impl GL {
     map_func_modern!{enable_vertex_array_attrib, glEnableVertexArrayAttrib: fn(vaobj: GLuint, index: GLuint)}  
     map_func_modern!{bind_texture_unit, glBindTextureUnit: fn(unit: GLuint, texture: GLuint)}  
     map_func_modern!{uniform_1iv, glUniform1iv: fn(location: GLint, count: GLsizei, value: *const GLint)}  
+    map_func_modern!{map_buffer, glMapBuffer: fn(target: GLenum, access: GLenum)}  
+    map_func_modern!{unmap_buffer, glUnmapBuffer: fn(target: GLenum) -> GLboolean}  
+    map_func_modern!{buffer_sub_data, glBufferSubData: fn(target: GLenum, offset: GLintptr, size: GLsizeiptr, data: *const c_void)}  
 }
