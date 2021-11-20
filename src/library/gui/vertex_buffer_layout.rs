@@ -58,15 +58,14 @@ impl<'b> VertexBufferLayout {
 }
 
 
-pub struct Position(pub f32, pub f32, pub f32);
+pub struct Position(pub f32, pub f32);
 
-pub struct RGBA(pub f32, pub f32, pub f32, pub f32);
+//pub struct RGBA(pub f32, pub f32, pub f32, pub f32);
 
 pub struct TextureCoords(pub f32, pub f32);
 
 pub struct Vertex {
     pub position: Position,
-    pub color: RGBA,
     pub texture_coords: TextureCoords,
     pub texture_id: f32,
 }
@@ -76,14 +75,28 @@ impl Vertex {
         let mut vec = Vec::new();
         vec.push(self.position.0);
         vec.push(self.position.1);
+        vec.push(self.texture_coords.0);
+        vec.push(self.texture_coords.1);
+        vec.push(self.texture_id);
+        vec
+        /*
         vec.push(self.position.2);
         vec.push(self.color.0);
         vec.push(self.color.1);
         vec.push(self.color.2);
         vec.push(self.color.3);
-        vec.push(self.texture_coords.0);
-        vec.push(self.texture_coords.1);
-        vec.push(self.texture_id);
-        vec
+        */
+    }
+}
+
+#[cfg(debug_assertions)]
+pub fn print_vertices(vertices: &Vec<f32>) {
+    println!("------ NEW FRAME ------");
+    for i in 0..vertices.len() / 5 {
+        print!("x: {:?}", vertices[i*5]);
+        print!(", y: {:?}", vertices[i*5+1]);
+        print!(", u: {:?}", vertices[i*5+2]);
+        print!(", v: {:?}", vertices[i*5+3]);
+        println!(", texture: {:?}", vertices[i*5+4]);
     }
 }

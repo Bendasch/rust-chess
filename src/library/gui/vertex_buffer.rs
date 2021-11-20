@@ -35,8 +35,8 @@ impl VertexBuffer {
         gl!(self.gl.bind_buffer(GL_ARRAY_BUFFER, 0));
     }
 
-    pub unsafe fn buffer_sub_data(&self, data_ptr: *const c_void, data_amount: usize) {
-        gl!(self.gl.buffer_sub_data(GL_ARRAY_BUFFER, 0, (size_of::<f32>() * data_amount) as i32, data_ptr));
+    pub unsafe fn buffer_sub_data(&self, data_ptr: *const c_void, data_amount: usize, offset: usize) {
+        gl!(self.gl.buffer_sub_data(GL_ARRAY_BUFFER, (size_of::<Vertex>() * offset) as i32, (size_of::<f32>() * data_amount) as i32, data_ptr));
     }
 }
 

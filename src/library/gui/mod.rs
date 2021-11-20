@@ -10,26 +10,50 @@ pub mod utils;
 pub mod texture;
 pub mod gl_maths;
 
+use crate::library::game::*;
 use crate::library::gui::{
     glfw::*,
-    renderer::Renderer,
+    renderer::{Renderer, callback},
     utils::print_opengl_version
 };
+use std::collections::LinkedList;
 
-pub unsafe fn run() {
+pub unsafe fn run(fen: Option<String>) {
 
-    let mut renderer = Renderer::init();
+    let mut game: LinkedList<State> = LinkedList::new();
+    game.push_back(State::new(fen));
+
+    let mut renderer: Renderer = Renderer::init();
 
     print_opengl_version(&renderer.gl);
     //print_opengl_extensions(&renderer.gl);
+    
+    glfwSetMouseButtonCallback(renderer.window, callback);
 
     while glfwWindowShouldClose(renderer.window) == 0 {
         
         renderer.clear();       
         
+        // who to move?
+        /* 
+        match game.back().unwrap().check_game_over() {
+            GameOver::BlackWon => {println!("Checkmate, black won!"); return},
+            GameOver::WhiteWon => {println!("Checkmate, white won!"); return}, 
+            GameOver::Stalemate => {println!("Stalemate!"); return},
+            _ => draw_who_to_move(game.back().unwrap().turn())
+        }
+        */
+
         renderer.update();
         
-        renderer.draw();
+        renderer.draw(game.back().unwrap().position_matrix().borrow());
+    
+        /* 
+        // get input from player
+        let mut move_string = String::new();
+        io::stdin().read_line(&mut move_string).unwrap();
+        State::perform_turn_from_input(move_string, &mut game);
+        */
         
         glfwSwapBuffers(renderer.window);
         

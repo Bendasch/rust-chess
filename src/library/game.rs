@@ -1,7 +1,7 @@
 use std::cmp::PartialEq;
 use std::cmp::max;
 use std::cell::RefCell;
-use std::cell::Ref;
+pub use std::cell::Ref;
 use std::collections::LinkedList;
 
 
@@ -179,7 +179,7 @@ impl <'a> Position {
 }
 
 #[derive(Clone, Debug)]
-pub struct PositionMatrix(Vec<Vec<Piece>>);
+pub struct PositionMatrix(pub Vec<Vec<Piece>>);
 
 impl PositionMatrix {
     
