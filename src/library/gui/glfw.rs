@@ -1,4 +1,4 @@
-use libc::{c_int, c_char};
+use libc::{c_int, c_char, c_void};
 
 #[allow(missing_copy_implementations)]
 pub enum GLFWmonitor {}
@@ -30,4 +30,6 @@ extern "C" {
     pub fn glfwSwapInterval(interval: c_int);
     pub fn glfwSetMouseButtonCallback(window: *const GLFWwindow, callback: extern fn(*const GLFWwindow, c_int, c_int, c_int)); 
     pub fn glfwGetCursorPos(window: *const GLFWwindow, xpos: *mut f64, ypos: *mut f64);
+    pub fn glfwSetWindowUserPointer(window: *const GLFWwindow, pointer: *const c_void);	
+    pub fn glfwGetWindowUserPointer(window: *const GLFWwindow) -> *const c_void;
 }

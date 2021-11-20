@@ -16,7 +16,9 @@ use std::{
     ffi::{CString},
     ptr::{null_mut},
     rc::Rc,
-    sync::Mutex
+    sync::{Arc, RwLock},
+    mem::forget,
+    collections::LinkedList,
 };
 use libc::{c_void, c_int};
 
@@ -33,12 +35,17 @@ pub struct Renderer {
     vertex_buffer: VertexBuffer,
     index_buffer: IndexBuffer,
     textures: Vec<Texture>,
-    selected_field: Mutex<Option<(u32, u32)>>
+    game_state: Arc<RwLock<GameState>>,
+}
+
+pub struct GameState {
+    pub selected_field: Option<(usize, usize)>,
+    pub game: LinkedList<State>,
 }
 
 impl Renderer {
     
-    pub unsafe fn init() -> Renderer  {
+    pub unsafe fn init(game: LinkedList<State>) -> Renderer  {
         
         let window: *mut GLFWwindow;
         let monitor: *mut GLFWmonitor = null_mut();
@@ -71,7 +78,7 @@ impl Renderer {
         let mut vertex_array = VertexArray::new(Rc::clone(&gl));
         vertex_array.add_buffer(&vertex_buffer, &layout);
         
-        let vertices = Renderer::get_board_vertices();
+        let vertices = Renderer::get_board_vertices(&None);
         vertex_buffer.bind();
         vertex_buffer.buffer_sub_data(vertices.as_ptr() as *const c_void, vertices.len(), 0);
         
@@ -95,6 +102,15 @@ impl Renderer {
         index_buffer.unbind();
         shader.unbind();
         
+        // "bind" the game state to the glfw window
+        //let selected_field = Arc::new(RwLock::new(None));
+        //let selected_field_cb = Arc::clone(&selected_field);
+        let game_state = Arc::new(RwLock::new(GameState{
+            selected_field: None,
+            game,
+        }));
+        glfwSetWindowUserPointer(window, Arc::as_ptr(&game_state) as *const c_void);
+        
         Renderer { 
             gl, 
             window,
@@ -103,9 +119,9 @@ impl Renderer {
             index_buffer,
             shader, 
             textures: vec![white_field, black_field, pieces],
-            selected_field: Mutex::new(None)
+            game_state
         }
-    }
+     }
     
     pub unsafe fn clear(&self) {
         gl!(self.gl.clear(GL_COLOR_BUFFER_BIT));
@@ -117,34 +133,40 @@ impl Renderer {
         self.shader.set_uniform_mat4f("u_MVP", mvp);
     }
     
-    pub unsafe fn draw(&self, position_matrix: Ref<PositionMatrix>) {
+    pub unsafe fn draw(&self) {
         
         self.shader.bind();
         for (i, texture) in self.textures.iter().enumerate() {
             texture.bind_texture_unit(i as u32);
         }
         
-        // bind the actual board state
-        let (piece_vertices, piece_indices) = Renderer::get_piece_vertices_and_indices(position_matrix);
+        // bind the actual board state        
+        let game_state = self.game_state.read().unwrap();
+        let vertices = Renderer::get_board_vertices(&game_state.selected_field);
+        let (piece_vertices, piece_indices) = Renderer::get_piece_vertices_and_indices(game_state.game.back().unwrap().position_matrix().borrow());
+        drop(game_state);
         self.vertex_buffer.bind();
+        self.vertex_buffer.buffer_sub_data(vertices.as_ptr() as *const c_void, vertices.len(), 0);
         self.vertex_buffer.buffer_sub_data(piece_vertices.as_ptr() as *const c_void, piece_vertices.len(), 324);
+        
         self.index_buffer.bind();
         self.index_buffer.buffer_sub_data(piece_indices.as_ptr() as *const c_void, piece_indices.len(), 384);
         
         self.vertex_array.bind();    
         gl!(self.gl.draw_elements(GL_TRIANGLES, *self.index_buffer.get_index_count(), GL_UNSIGNED_INT, 0 as *mut c_void));
     }
-
+    
     pub unsafe fn set_blend_func(gl: Rc<GL>) {
         gl!(gl.blend_func(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
         gl!(gl.enable(GL_BLEND));
     }
+    
+    pub fn get_board_vertices(selected_field: &Option<(usize, usize)>) -> Vec<f32> {
 
-    pub fn get_board_vertices() -> Vec<f32> {
         let mut vertices = Vec::new();
         for i in 0..=8 {
             for j in 0..=8 {
-
+                
                 let mut texture_id: f32;
                 
                 // upper right square
@@ -181,6 +203,16 @@ impl Renderer {
             }
         }
 
+        match *selected_field {
+            Some((x,y)) => { 
+                let selected_field_indices = Renderer::get_board_indices_for_field(x, y);
+                for index in selected_field_indices {
+                    vertices[index].texture_id = 3.0;
+                }
+            }
+            None => {},
+        };
+
         Renderer::deserialize(vertices)
     }
 
@@ -197,6 +229,17 @@ impl Renderer {
                 indices.push(36*i       + 4*j); 
             }
         }
+        indices
+    }
+
+    fn get_board_indices_for_field(x: usize, y: usize) -> Vec<usize> {
+        let mut indices = Vec::new();
+        indices.push(36*x       + 4*y);
+        indices.push(36*(x+1)   + 4*y     + 1);
+        indices.push(36*(x+1)   + 4*(y+1) + 2);
+        indices.push(36*(x+1)   + 4*(y+1) + 2);
+        indices.push(36*x       + 4*(y+1) + 3);
+        indices.push(36*x       + 4*y); 
         indices
     }
 
@@ -288,12 +331,46 @@ impl Renderer {
 }
 
 pub extern fn callback(window: *const GLFWwindow, button: c_int, action: c_int, _mods: c_int) {
-    if button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS {
-        let (x, y) = Renderer::get_clicked_field(window);
-        println!("x: {}, y: {}", x, y);
-        /*
-        let mut selected_field = SELECTED_FIELD.lock().unwrap(); 
-        *selected_field = Some((x,y));
-        */
+    if action == GLFW_PRESS {
+        match button {
+            GLFW_MOUSE_BUTTON_LEFT =>  {
+                let (x, y) = Renderer::get_clicked_field(window);
+                unsafe { toggle_field(glfwGetWindowUserPointer(window), (x, y)); }
+            },
+            GLFW_MOUSE_BUTTON_RIGHT => {
+                unsafe { deselected_field(glfwGetWindowUserPointer(window)); }
+            },
+            _ => return,
+        }
     }
+}
+
+pub unsafe fn toggle_field(pointer: *const c_void, value: (usize, usize)) {
+    /*
+    let selected_field_arc = Arc::from_raw(pointer as *const RwLock<Option<(usize, usize)>>);
+    */
+    let game_state_arc = Arc::from_raw(pointer as *const RwLock<GameState>);
+    let mut game_state = game_state_arc.write().unwrap();
+    let return_value = match game_state.selected_field {
+        Some(inner) if inner == value => None,
+        Some(inner) if inner != value => {
+            let mut move_string = String::new();
+            move_string.push(char::from_digit(inner.1 as u32 + 1, 10).unwrap());
+            move_string.push(char::from_digit(inner.0 as u32 + 1, 10).unwrap());
+            move_string.push(char::from_digit(value.1 as u32 + 1, 10).unwrap());
+            move_string.push(char::from_digit(value.0 as u32 + 1, 10).unwrap());
+            State::perform_turn_from_input(move_string, &mut game_state.game);
+            None
+        },
+        _ => Some(value),
+    };
+    game_state.selected_field = return_value;
+    drop(game_state);
+    forget(game_state_arc);
+}
+
+pub unsafe fn deselected_field(pointer: *const c_void) {
+    let selected_field_arc = Arc::from_raw(pointer as *const RwLock<Option<(usize, usize)>>);
+    *selected_field_arc.write().unwrap() = None;
+    forget(selected_field_arc);
 }

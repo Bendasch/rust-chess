@@ -23,7 +23,7 @@ pub unsafe fn run(fen: Option<String>) {
     let mut game: LinkedList<State> = LinkedList::new();
     game.push_back(State::new(fen));
 
-    let mut renderer: Renderer = Renderer::init();
+    let mut renderer: Renderer = Renderer::init(game);
 
     print_opengl_version(&renderer.gl);
     //print_opengl_extensions(&renderer.gl);
@@ -46,15 +46,8 @@ pub unsafe fn run(fen: Option<String>) {
 
         renderer.update();
         
-        renderer.draw(game.back().unwrap().position_matrix().borrow());
-    
-        /* 
-        // get input from player
-        let mut move_string = String::new();
-        io::stdin().read_line(&mut move_string).unwrap();
-        State::perform_turn_from_input(move_string, &mut game);
-        */
-        
+        renderer.draw();
+
         glfwSwapBuffers(renderer.window);
         
         glfwPollEvents();
