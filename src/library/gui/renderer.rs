@@ -22,9 +22,8 @@ use std::{
 };
 use libc::{c_void, c_int};
 
-pub static WIDTH: f32 = 1024.0;
-pub static HEIGHT: f32 = 768.0;
-//static SELECTED_FIELD: Mutex<Option<(usize, usize)>> = Mutex::new(None);
+pub static mut WIDTH: f32 = 1024.0;
+pub static mut HEIGHT: f32 = 768.0;
 
 #[allow(dead_code)]
 pub struct Renderer {
@@ -103,12 +102,11 @@ impl Renderer {
         shader.unbind();
         
         // "bind" the game state to the glfw window
-        //let selected_field = Arc::new(RwLock::new(None));
-        //let selected_field_cb = Arc::clone(&selected_field);
         let game_state = Arc::new(RwLock::new(GameState{
             selected_field: None,
             game,
         }));
+        
         glfwSetWindowUserPointer(window, Arc::as_ptr(&game_state) as *const c_void);
         
         Renderer { 
@@ -131,6 +129,7 @@ impl Renderer {
         let mvp = ortho(0.0, WIDTH, 0.0, HEIGHT, -0.5, 0.5);
         self.shader.bind();
         self.shader.set_uniform_mat4f("u_MVP", mvp);
+        gl!(self.gl.viewport(0, 0, WIDTH as i32, HEIGHT as i32));
     }
     
     pub unsafe fn draw(&self) {
@@ -161,7 +160,7 @@ impl Renderer {
         gl!(gl.enable(GL_BLEND));
     }
     
-    pub fn get_board_vertices(selected_field: &Option<(usize, usize)>) -> Vec<f32> {
+    pub unsafe fn get_board_vertices(selected_field: &Option<(usize, usize)>) -> Vec<f32> {
 
         let mut vertices = Vec::new();
         for i in 0..=8 {
@@ -251,7 +250,7 @@ impl Renderer {
         result
     }
 
-    fn get_piece_vertices_and_indices(position_matrix: Ref<PositionMatrix>) -> (Vec<f32>, Vec<u32>) {
+    unsafe fn get_piece_vertices_and_indices(position_matrix: Ref<PositionMatrix>) -> (Vec<f32>, Vec<u32>) {
         let mut vertices = Vec::new();
         let mut indices = Vec::new();
         const INDEX_OFFSET: u32 = 324;
@@ -315,8 +314,8 @@ impl Renderer {
         (u, v)
     }
     
-    pub fn get_clicked_field(window: *const GLFWwindow) -> (usize, usize) {
-        let (xpos, ypos) = unsafe{Renderer::get_cursor_position(window)};
+    pub unsafe fn get_clicked_field(window: *const GLFWwindow) -> (usize, usize) {
+        let (xpos, ypos) = Renderer::get_cursor_position(window);
         let x = xpos / WIDTH * 8.0;
         let y = ypos / HEIGHT * 8.0;
         (x as usize, y as usize)
@@ -330,18 +329,34 @@ impl Renderer {
     }
 }
 
-pub extern fn callback(window: *const GLFWwindow, button: c_int, action: c_int, _mods: c_int) {
+pub extern fn click_callback(window: *const GLFWwindow, button: c_int, action: c_int, _mods: c_int) {
     if action == GLFW_PRESS {
         match button {
             GLFW_MOUSE_BUTTON_LEFT =>  {
-                let (x, y) = Renderer::get_clicked_field(window);
-                unsafe { toggle_field(glfwGetWindowUserPointer(window), (x, y)); }
+                unsafe {
+                    let (x, y) = Renderer::get_clicked_field(window);
+                    toggle_field(glfwGetWindowUserPointer(window), (x, y)); 
+                }
             },
             GLFW_MOUSE_BUTTON_RIGHT => {
                 unsafe { deselected_field(glfwGetWindowUserPointer(window)); }
             },
             _ => return,
         }
+    }
+}
+
+pub extern fn window_size_callback(_window: *const GLFWwindow, width: c_int, height: c_int) {
+    unsafe {
+        WIDTH = width as f32;
+        HEIGHT = height as f32;
+    }
+}
+
+pub extern fn framebuffer_size_callback(_window: *const GLFWwindow, width: c_int, height: c_int) {
+    unsafe {
+        WIDTH = width as f32;
+        HEIGHT = height as f32;
     }
 }
 

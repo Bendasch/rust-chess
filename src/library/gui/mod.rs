@@ -13,7 +13,11 @@ pub mod gl_maths;
 use crate::library::game::*;
 use crate::library::gui::{
     glfw::*,
-    renderer::{Renderer, callback},
+    renderer::{
+        Renderer, 
+        click_callback, 
+        framebuffer_size_callback
+    },
     utils::print_opengl_version
 };
 use std::collections::LinkedList;
@@ -28,7 +32,8 @@ pub unsafe fn run(fen: Option<String>) {
     print_opengl_version(&renderer.gl);
     //print_opengl_extensions(&renderer.gl);
     
-    glfwSetMouseButtonCallback(renderer.window, callback);
+    glfwSetMouseButtonCallback(renderer.window, click_callback);
+    glfwSetFramebufferSizeCallback(renderer.window, framebuffer_size_callback);
 
     while glfwWindowShouldClose(renderer.window) == 0 {
         

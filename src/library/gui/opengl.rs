@@ -247,6 +247,7 @@ extern "C" {
     pub fn glDeleteTextures(n: GLsizei, textures: *const GLuint);
     pub fn glBlendFunc(sfactor: GLenum, dfactor: GLenum);
     pub fn glEnable(cap: GLenum);
+    pub fn glViewport(x: GLint, y: GLint, width: GLsizei, height: GLsizei);
 }
 
 bind!{
@@ -295,6 +296,7 @@ bind!{
         glMapBuffer: fn(target: GLenum, access: GLenum),
         glUnmapBuffer: fn(target: GLenum) -> GLboolean,
         glBufferSubData: fn(target: GLenum, offset: GLintptr, size: GLsizeiptr, data: *const c_void),
+        //glViewport: fn(x: GLint, y: GLint, width: GLsizei, height: GLsizei),
     }
 }
 
@@ -320,6 +322,7 @@ impl GL {
     map_func_legacy!{delete_textures, glDeleteTextures: fn(n: GLsizei, textures: *const GLuint)}  
     map_func_legacy!{blend_func, glBlendFunc: fn(sfactor: GLenum, dfactor: GLenum)}  
     map_func_legacy!{enable, glEnable: fn(cap: GLenum)}  
+    map_func_legacy!{viewport, glViewport: fn(x: GLint, y: GLint, width: GLsizei, height: GLsizei)}  
     
 
     /*
@@ -364,4 +367,5 @@ impl GL {
     map_func_modern!{map_buffer, glMapBuffer: fn(target: GLenum, access: GLenum)}  
     map_func_modern!{unmap_buffer, glUnmapBuffer: fn(target: GLenum) -> GLboolean}  
     map_func_modern!{buffer_sub_data, glBufferSubData: fn(target: GLenum, offset: GLintptr, size: GLsizeiptr, data: *const c_void)}  
+    //map_func_modern!{viewport, glViewport: fn(x: GLint, y: GLint, width: GLsizei, height: GLsizei)}  
 }
