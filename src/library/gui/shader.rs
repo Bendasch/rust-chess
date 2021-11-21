@@ -1,6 +1,5 @@
 use crate::gl;
-use crate::library::gui::opengl::*;
-use crate::library::gui::utils::*;
+use crate::library::gui::{opengl::*, utils::*, maths::Mat4};
 use std::{
     ffi::{CString, CStr},
     ptr::{null_mut},
@@ -10,7 +9,6 @@ use std::{
     rc::Rc,
 };
 use libc::{c_uint, c_char};
-use crate::library::gui::gl_maths::Mat4;
 
 pub struct Shader {
     gl: Rc<GL>,
@@ -140,8 +138,9 @@ impl Shader {
         let location = self.get_uniform_location(name);
         gl!(self.gl.uniform_1i(*location, v0));
     }
-    
+
     pub unsafe fn set_uniform_1iv(&mut self, name: &str, vec: Vec<GLint>) {
+    
         self.cache_uniform_location(name);
         let location = self.get_uniform_location(name);
         gl!(self.gl.uniform_1iv(*location, vec.len() as i32, &vec[0] as *const GLint));
@@ -165,11 +164,9 @@ impl Shader {
     unsafe fn get_uniform_location(&self, name: &str) -> &i32 {    
         self.uniforms.get(name).unwrap()
     }
-
 }
 
 impl Drop for Shader { 
-    
     fn drop(&mut self) {
         unsafe{ 
             gl!(self.gl.delete_program(self.shader_id));
@@ -184,17 +181,17 @@ pub mod tests {
     
     #[test]
     fn read_shaders_from_file_vertex() {
-        let (vertex, _) = Shader::parse_file("./src/library/opengl/simple.shader");
+        let (vertex, _) = Shader::parse_file("./src/library/gui/res/simple.shader");
         let vertex_string = String::from(vertex.to_str().unwrap());
         let line_vec: Vec<&str> = vertex_string.split("\n").collect();
-        assert_eq!(line_vec[0].trim(), "#version 330 core");
+        assert_eq!(line_vec[0].trim(), "#version 450 core");
     }
     
     #[test]
     fn read_shaders_from_file_fragment() {
-        let (_, fragment) = Shader::parse_file("./src/library/opengl/simple.shader");
+        let (_, fragment) = Shader::parse_file("./src/library/gui/res/simple.shader");
         let fragment_string = String::from(fragment.to_str().unwrap());
         let line_vec: Vec<&str> = fragment_string.split("\n").collect();
-        assert_eq!(line_vec[0].trim(), "#version 330 core");
+        assert_eq!(line_vec[0].trim(), "#version 450 core");
     }
 }

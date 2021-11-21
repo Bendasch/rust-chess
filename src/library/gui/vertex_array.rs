@@ -1,8 +1,5 @@
 use crate::gl;
-use crate::library::gui::utils::*;
-use crate::library::gui::opengl::*;
-use crate::library::gui::vertex_buffer::*;
-use crate::library::gui::vertex_buffer_layout::*;
+use crate::library::gui::{utils::*, opengl::*, vertex_buffer::*};
 use libc::{c_uint, c_void};
 use std::rc::Rc;
 

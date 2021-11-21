@@ -4,22 +4,12 @@ pub mod renderer;
 pub mod vertex_buffer;
 pub mod index_buffer;
 pub mod vertex_array;
-pub mod vertex_buffer_layout;
 pub mod shader;
 pub mod utils;
 pub mod texture;
-pub mod gl_maths;
+pub mod maths;
 
-use crate::library::game::*;
-use crate::library::gui::{
-    glfw::*,
-    renderer::{
-        Renderer, 
-        click_callback, 
-        framebuffer_size_callback
-    },
-    utils::print_opengl_version
-};
+use crate::library::{game::*, gui::{glfw::*, renderer::*, utils::print_opengl_version}};
 use std::collections::LinkedList;
 
 pub unsafe fn run(fen: Option<String>) {
@@ -39,8 +29,8 @@ pub unsafe fn run(fen: Option<String>) {
         
         renderer.clear();       
         
-        // who to move?
         /* 
+        // TO DO: Draw who to move.
         match game.back().unwrap().check_game_over() {
             GameOver::BlackWon => {println!("Checkmate, black won!"); return},
             GameOver::WhiteWon => {println!("Checkmate, white won!"); return}, 

@@ -1,9 +1,5 @@
-use std::cmp::PartialEq;
-use std::cmp::max;
-use std::cell::RefCell;
+use std::{cmp::PartialEq, cmp::max, cell::RefCell, collections::LinkedList};
 pub use std::cell::Ref;
-use std::collections::LinkedList;
-
 
 pub enum GameOver {
     No, 
@@ -27,6 +23,32 @@ pub struct CastleAvailability {
     black_queen: bool,
 }
 
+#[derive(PartialEq, Copy, Clone, Debug)]
+pub struct Piece {  
+    color: Color,
+    piecetype: PieceType,
+}
+
+impl Piece {
+    pub fn color(&self) -> &Color {
+        &self.color
+    }
+    pub fn piecetype(&self) -> &PieceType {
+        &self.piecetype
+    }
+}
+
+#[derive(PartialEq, Copy, Clone, Debug)]
+pub enum PieceType {
+    Rook,
+    Knight,
+    Bishop,
+    Queen, 
+    King,
+    Pawn,
+    None
+}
+
 #[derive(PartialEq, Debug, Clone)]
 pub struct Field(pub usize, pub usize);
 
@@ -34,6 +56,7 @@ pub struct PieceInstance {
     piece: Piece,
     field: Field
 }
+
 impl PieceInstance {
     pub fn piece(&self) -> &Piece { &self.piece }
     pub fn field(&self) -> &Field { &self.field }
@@ -107,31 +130,6 @@ impl Move {
     }
 }
 
-#[derive(PartialEq, Copy, Clone, Debug)]
-pub struct Piece {  
-    color: Color,
-    piecetype: PieceType,
-}
-
-impl Piece {
-    pub fn color(&self) -> &Color {
-        &self.color
-    }
-    pub fn piecetype(&self) -> &PieceType {
-        &self.piecetype
-    }
-}
-
-#[derive(PartialEq, Copy, Clone, Debug)]
-pub enum PieceType {
-    Rook,
-    Knight,
-    Bishop,
-    Queen, 
-    King,
-    Pawn,
-    None
-}
 #[derive(Clone, Debug)]
 pub struct Position(String);
 
@@ -199,7 +197,7 @@ impl PositionMatrix {
         &self.0[field.0][field.1].piecetype()
     }
 
-    fn take_piece(&mut self, field: &Field) -> Piece {
+    fn remove_piece_from_field(&mut self, field: &Field) -> Piece {
         let piece = self.0[field.0][field.1]; 
         self.0[field.0][field.1] = Piece{color: Color::None, piecetype: PieceType::None};
         piece
@@ -371,7 +369,6 @@ impl<'a> State {
 
         // iterate through the whole field and try to move each of the players piece
         // if one piece can move, return true
-
         for (i, rank) in self.position_matrix().borrow().0.iter().enumerate() {
             for (j, piece) in rank.iter().enumerate() {
                 
@@ -400,6 +397,7 @@ impl<'a> State {
             }
         }
 
+        // if no legal moves were found, return false
         false
     }
     
@@ -430,17 +428,19 @@ impl<'a> State {
         ).collect();
         
         // assert that the moves are within the bounds of the field
+        // TO DO: errors should properly propagated to the UI rather than panicking!
         assert!(1 <= move_indices[0] && move_indices[0] <= 8);
         assert!(1 <= move_indices[1] && move_indices[1] <= 8);
         assert!(1 <= move_indices[2] && move_indices[2] <= 8);
         assert!(1 <= move_indices[3] && move_indices[3] <= 8);
-        
+                
+        // create a move instance
         let start_field = Field(move_indices[0]-1, move_indices[1]-1);
         let target_field = Field(move_indices[2]-1, move_indices[3]-1);
-        
-        // create a move instance and check whether the move is legal
-        // later we might save the moves instead of the state states
         let chess_move = Move::new(&start_field, &target_field, game.back_mut().unwrap().position_matrix().borrow());
+        
+        // check whether the move is legal
+        // TO DO: errors should properly propagated to the UI rather than panicking!
         if !game.back().unwrap().is_move_legal(&chess_move) { panic!(
             "Illegal move. {:?} cant move {} from {:?} to {:?}", 
             game.back_mut().unwrap().turn(),
@@ -449,10 +449,9 @@ impl<'a> State {
             chess_move.target_field()
         );}
         
-        // create a new state instance 
+        // create a new game state by executing the move and push it to the game list 
         let new_state: State = game.back_mut().unwrap().execute_move(&chess_move);
         new_state.position().borrow_mut().update_from_matrix(new_state.position_matrix().borrow());
-        
         game.push_back(new_state);
     }
     
@@ -473,17 +472,17 @@ impl<'a> State {
         if !self.piece_can_reach_target_field(chess_move) { 
             return false;
         }
-
+        
         // assert that none of the player's own pieces are on the target field
         if self.position_matrix().borrow().get_color_of_piece_on_field(chess_move.target_field()) == self.turn() {
             return false;
         }
-
+        
         // assert that the way to the target field is not blocked
         if !self.piece_has_path_to_target_field(chess_move) { 
             return false;
         }
-
+        
         // assert that the player's king is not in check after the planned move
         // this both prevents pieces moving from pins and moves during checks which don't stop those checks
         // make a 'hypothetical move' and check whether the player would be in check
@@ -497,6 +496,7 @@ impl<'a> State {
             return false;
         } 
 
+        // the move is legal, if no condition made it illegal
         true
     }
 
@@ -527,8 +527,8 @@ impl<'a> State {
             },
             PieceType::King if chess_move.piece().color() == &Color::Black => {
                 (rank_diff_abs <= 1 && file_diff_abs <= 1 && (rank_diff_abs + file_diff_abs) >= 1) ||
-                (chess_move.target_field().0 == 7 && chess_move.target_field().1 == 2 && self.castle_availability().white_queen) ||
-                (chess_move.target_field().0 == 7 && chess_move.target_field().1 == 6 && self.castle_availability().white_king)
+                (chess_move.target_field().0 == 7 && chess_move.target_field().1 == 2 && self.castle_availability().black_queen) ||
+                (chess_move.target_field().0 == 7 && chess_move.target_field().1 == 6 && self.castle_availability().black_king)
             },
             PieceType::Pawn if chess_move.piece().color() == &Color::White => { 
                 (rank_diff == 1 && file_diff_abs == 0) || 
@@ -562,6 +562,7 @@ impl<'a> State {
                     )
                 ))
             },
+
             _ => panic!("Move not properly processed. {:?}", chess_move) 
         }
     }
@@ -669,7 +670,7 @@ impl<'a> State {
             -1 => Field(chess_move.target_field().0, 0),
             _  => panic!("Something terrible happened: {:?}", direction) 
         };
-        let rook = self.position_matrix().borrow_mut().take_piece(&rook_start_field);
+        let rook = self.position_matrix().borrow_mut().remove_piece_from_field(&rook_start_field);
         
         // place rook again
         let rook_target_field = Field(chess_move.target_field().0, (chess_move.target_field().1 as isize - direction) as usize);
@@ -702,29 +703,31 @@ impl<'a> State {
         // we need to remove the pawn from the field 
         // just below/above the target field (depending on the color)
         if self.turn() == &Color::White {
-            self.position_matrix().borrow_mut().take_piece(&Field(target.0-1, target.1));
+            self.position_matrix().borrow_mut().remove_piece_from_field(&Field(target.0-1, target.1));
         } else {
-            self.position_matrix().borrow_mut().take_piece(&Field(target.0+1, target.1));
+            self.position_matrix().borrow_mut().remove_piece_from_field(&Field(target.0+1, target.1));
         }
     }
 
     fn execute_move(&self, chess_move: &Move) -> State {
         
+        // the current board serves as the basis of the next state, but itself is left as-is.
         let mut new_state = self.clone();
 
-        new_state.position_matrix().borrow_mut().take_piece(&chess_move.start_field);
+        // take the piece that is moving
+        new_state.position_matrix().borrow_mut().remove_piece_from_field(&chess_move.start_field);
     
-        let taken_piece: Piece = new_state.position_matrix().borrow_mut().place_piece(chess_move.piece, &chess_move.target_field);
+        // place it on the new field and take the piece that was on it
+        let captured_piece: Piece = new_state.position_matrix().borrow_mut().place_piece(chess_move.piece, &chess_move.target_field);
 
+        // castling and en-passant need to be handled separately
         new_state.move_rook_when_castling(chess_move);
-        
-        new_state.remove_enemy_pawn_en_passant(chess_move);
-        
         new_state.update_castling_availability(chess_move);
-        
+        new_state.remove_enemy_pawn_en_passant(chess_move);
         new_state.update_en_passant(chess_move);
         
-        if taken_piece.piecetype() != &PieceType::None || chess_move.piece().piecetype() == &PieceType::Pawn {
+        // turn the clocks
+        if captured_piece.piecetype() != &PieceType::None || chess_move.piece().piecetype() == &PieceType::Pawn {
             new_state.halfmove_clock = 0;
         } else {
             new_state.halfmove_clock += 1;
@@ -740,26 +743,22 @@ impl<'a> State {
     }
 
     fn update_en_passant(&mut self, chess_move: &Move) {
-        if chess_move.piece().piecetype() != &PieceType::Pawn {
+
+        if chess_move.piece().piecetype() != &PieceType::Pawn || chess_move.rank_distance() < 2 {
             self.en_passant = None;
             return;  
         }
-        
-        if chess_move.rank_distance() < 2 {
-            self.en_passant = None;
-            return;
-        }
 
         // the en passant field is the field between the pawns starting and target field 
-        let en_passant_field: Field = match self.turn() {
-            &Color::White => Field(chess_move.start_field().0 + 1, chess_move.start_field().1),
-            &Color::Black => Field(chess_move.start_field().0 - 1, chess_move.start_field().1),
+        self.en_passant = match self.turn() {
+            &Color::White => Some(Field(chess_move.start_field().0 + 1, chess_move.start_field().1)),
+            &Color::Black => Some(Field(chess_move.start_field().0 - 1, chess_move.start_field().1)),
             _ => panic!("Invalid game state, no turn. {:?}", self)
-        };
-        self.en_passant = Some(en_passant_field);
+        };        
     }
 
     fn update_castling_availability(&mut self, chess_move: &Move) {
+
         if chess_move.piece().piecetype() != &PieceType::Rook && chess_move.piece().piecetype() != &PieceType::King {
             return; // nothing to do here
         }
@@ -879,7 +878,7 @@ mod tests {
     fn matrix_take_piece() {
         let state = State::new(None);
         assert!(state.position_matrix().borrow().0[0][0] != Piece{color: Color::None, piecetype: PieceType::None});
-        state.position_matrix().borrow_mut().take_piece(&Field(0,0));
+        state.position_matrix().borrow_mut().remove_piece_from_field(&Field(0,0));
         assert!(state.position_matrix().borrow().0[0][0] == Piece{color: Color::None, piecetype: PieceType::None});
     }
 
@@ -1231,8 +1230,7 @@ mod tests {
         assert!(!state.piece_can_reach_target_field(&chess_move));
     }
  
-    #[test]
-    fn queen_can_reach_target_field() {       
+    #[test]   fn queen_can_reach_target_field() {       
         let state = State::new(None);
     
         // one diagonal up
@@ -1367,7 +1365,6 @@ mod tests {
         let chess_move = Move::new(&start_field, &target_field, state.position_matrix().borrow());
         assert!(!State::piece_has_path_to_target_field(&state, &chess_move));
     }
-
 
     /*
         position: RefCell<Position>,

@@ -5,11 +5,10 @@ use crate::library::gui::{
     opengl::*,
     index_buffer::*,
     vertex_buffer::*,
-    vertex_buffer_layout::*,
     vertex_array::*,
     shader::*,
     utils::*,
-    gl_maths::*,
+    maths::*,
     texture::*
 };
 use std::{
@@ -22,6 +21,14 @@ use std::{
 };
 use libc::{c_void, c_int};
 
+/*
+    Currently, loads of things need to be refactored:
+        - which methods need to be methods of the 'Renderer' struct?
+        - how should state be passed to glfw?
+        - how can the drawing be meaningfully abstracted?
+*/
+
+// TO DO: Refactor the way the renderer and game state are passed to glfw callbacks.
 pub static mut WIDTH: f32 = 1024.0;
 pub static mut HEIGHT: f32 = 768.0;
 
@@ -44,6 +51,7 @@ pub struct GameState {
 
 impl Renderer {
     
+    // TO DO: Refactor this method...
     pub unsafe fn init(game: LinkedList<State>) -> Renderer  {
         
         let window: *mut GLFWwindow;
@@ -86,7 +94,7 @@ impl Renderer {
         index_buffer.bind();
         index_buffer.buffer_sub_data(board_indices.as_ptr() as *const c_void, board_indices.len(), 0);
         
-        let mut shader = Shader::new(String::from("./src/library/gui/simple.shader"), Rc::clone(&gl));
+        let mut shader = Shader::new(String::from("./src/library/gui/res/simple.shader"), Rc::clone(&gl));
         shader.bind();
         
         let white_field = Texture::new("./src/library/gui/res/img/white_field.png", Rc::clone(&gl));
@@ -125,6 +133,7 @@ impl Renderer {
         gl!(self.gl.clear(GL_COLOR_BUFFER_BIT));
     }
     
+    // TO DO: Refactor this method...
     pub unsafe fn update(&mut self) {    
         let mvp = ortho(0.0, WIDTH, 0.0, HEIGHT, -0.5, 0.5);
         self.shader.bind();
@@ -132,6 +141,7 @@ impl Renderer {
         gl!(self.gl.viewport(0, 0, WIDTH as i32, HEIGHT as i32));
     }
     
+    // TO DO: Refactor this method...
     pub unsafe fn draw(&self) {
         
         self.shader.bind();
@@ -160,6 +170,7 @@ impl Renderer {
         gl!(gl.enable(GL_BLEND));
     }
     
+    // TO DO: Move creation of one vertex into own method!
     pub unsafe fn get_board_vertices(selected_field: &Option<(usize, usize)>) -> Vec<f32> {
 
         let mut vertices = Vec::new();

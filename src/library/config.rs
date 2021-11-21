@@ -1,5 +1,4 @@
-use std::env;
-use std::fmt;
+use std::{env, fmt};
 
 pub enum UiType {
     CLI,
@@ -14,6 +13,7 @@ impl fmt::Display for UiType {
         } 
     }    
 }
+
 pub struct Config {
     pub ui_type: UiType,
     pub fen: Option<String>

@@ -1,11 +1,7 @@
 use crate::gl;
-use crate::library::gui::opengl::*;
-use crate::library::gui::utils::*;
+use crate::library::gui::{opengl::*, utils::*};
 use libc::{c_void, c_uint};
-use std::{
-    mem::size_of,
-    rc::Rc,
-};
+use std::{mem::size_of,rc::Rc};
 
 pub struct IndexBuffer {
     gl: Rc<GL>,

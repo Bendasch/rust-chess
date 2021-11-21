@@ -1,7 +1,6 @@
 #[allow(unused_imports)]
+use std::{ffi::CString, mem::transmute, ptr};
 use libc::{c_int, c_uint, c_char, c_uchar, c_float, c_void};
-use std::ffi::{CString};
-use std::mem::transmute;
 
 /*
     WGL FUNCTION POINTERS
@@ -22,12 +21,12 @@ pub unsafe fn get_function_pointer(name: &str) -> *const () {
 
 macro_rules! bind {
     (pub struct GL {
-        $($name:ident: fn($( $param:ident: $typ:ty ),*) $(-> $ret:ty)*),* $(,)* 
+        $($name:ident: Option<fn($( $param:ident: $typ:ty ),*) $(-> $ret:ty)*>),* $(,)* 
     }) => {
         
         #[allow(non_snake_case)]
         pub struct GL {
-            $(pub $name: fn($( $param: $typ ),*) $(-> $ret)*),*
+            $(pub $name: Option<fn($( $param: $typ ),*) $(-> $ret)*>),*
         }
 
         #[allow(non_snake_case)]
@@ -35,8 +34,11 @@ macro_rules! bind {
         
             pub unsafe fn bind() -> GL {
                 GL {
-                    $(
-                        $name: transmute::<*const (), fn($( $param: $typ ),*) $(-> $ret)*> (get_function_pointer(stringify!($name)))
+                    $(                      
+                        $name: match get_function_pointer(stringify!($name)) {
+                            ptr if ptr.cast::<i32>().is_null() => None,
+                            ptr => Some(transmute::<*const (), fn($( $param: $typ ),*) $(-> $ret)*> (ptr)),
+                        }
                     ),*
                 }
             }
@@ -48,13 +50,19 @@ macro_rules! map_func_modern {
     ($fn:ident, $glname:ident: fn($( $param:ident: $typ:ty ),*)) => {
         #[inline(always)]
         pub fn $fn(&self, $( $param: $typ ),*) {
-            (self.$glname)($( $param ),*);
+            match self.$glname {
+                Some(func) => (func)($( $param ),*),
+                None => panic!("Function {} could not be bound in the current OpenGL context.", stringify!($glname)),
+            };
         }
     };
     ($fn:ident, $glname:ident: fn($( $param:ident: $typ:ty ),*) $(-> $ret:ty)*) => {
         #[inline(always)]
         pub fn $fn(&self, $( $param: $typ ),*) $(-> $ret)* {
-            (self.$glname)($( $param ),*)
+            match self.$glname {
+                Some(func) => (func)($( $param ),*),
+                None => panic!("Function {} could not be bound in the current OpenGL context.", stringify!($glname)),
+            }
         }
     };
 }
@@ -257,46 +265,46 @@ bind!{
             OPENGL MODERN FUNCTION POINTERS
             > extracted on startup through wglGetProcAddress
         */
-        glCreateShader: fn(shaderType: GLenum) -> GLuint,
-        glGenBuffers: fn(n: GLsizei, buffers: *mut GLuint),
-        glGetUniformLocation: fn(program: GLuint, name: *const GLchar) -> GLint,
-        glUniform4f: fn(location: GLint, v0: GLfloat, v1: GLfloat, v2: GLfloat, v3: GLfloat),
-        glDeleteProgram: fn(program: GLuint),
-        glGetShaderInfoLog: fn(shader: GLuint, maxLength: GLsizei, length: *mut GLsizei, infoLog: *mut GLchar),
-        glGetShaderiv: fn(shader: GLuint, pname: GLenum, params: *const GLint),
-        glDeleteShader: fn(shader: GLuint),
-        glUseProgram: fn(program: GLuint),
-        glValidateProgram: fn(program: GLuint),
-        glLinkProgram: fn(program: GLuint),
-        glAttachShader: fn(program: GLuint, shader: GLuint),
-        glCompileShader: fn(shader: GLuint),
-        glShaderSource: fn(shader: GLuint, count: GLsizei, string: *const *const GLchar, length: *const GLint),
-        glCreateProgram: fn() -> GLuint,
-        glVertexAttribPointer: fn(index: GLuint, size: GLint, _type: GLenum, normalized: GLboolean, stride: GLsizei, function_pointer: *const GLvoid),
-        glEnableVertexAttribArray: fn(index: GLuint),
-        glBufferData: fn(target: GLenum, size: GLsizeiptr, data: *const c_void, usage: GLenum),
-        glBindBuffer: fn(target: GLenum, buffer: GLuint),
-        glGetStringi:fn(name: GLenum, index: GLuint) -> *const GLubyte,
-        glGenVertexArrays: fn(n: GLsizei, arrays: *const GLuint),
-        glBindVertexArray: fn(array: GLuint),
-        glDeleteBuffers: fn(n: GLsizei, buffers: *const GLuint),
-        glDeleteVertexArrays: fn(n: GLsizei, arrays: *const GLuint),
-        //glGenTextures: fn(n: GLsizei, textures: *const GLuint),
-        //glBindTexture: fn(target: GLenum, texture: GLuint),
-        //glTexParameteri: fn(target: GLenum, pname: GLenum, param: GLint),
-        //glTexImage2D: fn(target: GLenum, level: GLint, internalformat: GLint, width: GLsizei, height: GLsizei, border: GLint, format: GLenum, _type: GLenum, data: *const c_void),
-        glDeleteTextures: fn(n: GLsizei, textures: *const GLuint),
-        glActiveTexture: fn(textures: GLenum),
-        glUniform1i: fn(location: GLint, v0: GLint),
-        //glBlendFunc: fn(sfactor: GLenum, dfactor: GLenum),
-        glUniformMatrix4fv: fn(location: GLint, count: GLsizei, transpose: GLboolean, value: *const GLfloat),
-        glEnableVertexArrayAttrib: fn(vaobj: GLuint, index: GLuint),
-        glBindTextureUnit: fn(unit: GLuint, texture: GLuint),
-        glUniform1iv: fn(location: GLint, count: GLsizei, value: *const GLint),
-        glMapBuffer: fn(target: GLenum, access: GLenum),
-        glUnmapBuffer: fn(target: GLenum) -> GLboolean,
-        glBufferSubData: fn(target: GLenum, offset: GLintptr, size: GLsizeiptr, data: *const c_void),
-        //glViewport: fn(x: GLint, y: GLint, width: GLsizei, height: GLsizei),
+        glCreateShader: Option<fn(shaderType: GLenum) -> GLuint>,
+        glGenBuffers: Option<fn(n: GLsizei, buffers: *mut GLuint)>,
+        glGetUniformLocation: Option<fn(program: GLuint, name: *const GLchar) -> GLint>,
+        glUniform4f: Option<fn(location: GLint, v0: GLfloat, v1: GLfloat, v2: GLfloat, v3: GLfloat)>,
+        glDeleteProgram: Option<fn(program: GLuint)>,
+        glGetShaderInfoLog: Option<fn(shader: GLuint, maxLength: GLsizei, length: *mut GLsizei, infoLog: *mut GLchar)>,
+        glGetShaderiv: Option<fn(shader: GLuint, pname: GLenum, params: *const GLint)>,
+        glDeleteShader: Option<fn(shader: GLuint)>,
+        glUseProgram: Option<fn(program: GLuint)>,
+        glValidateProgram: Option<fn(program: GLuint)>,
+        glLinkProgram: Option<fn(program: GLuint)>,
+        glAttachShader: Option<fn(program: GLuint, shader: GLuint)>,
+        glCompileShader: Option<fn(shader: GLuint)>,
+        glShaderSource: Option<fn(shader: GLuint, count: GLsizei, string: *const *const GLchar, length: *const GLint)>,
+        glCreateProgram: Option<fn() -> GLuint>,
+        glVertexAttribPointer: Option<fn(index: GLuint, size: GLint, _type: GLenum, normalized: GLboolean, stride: GLsizei, function_pointer: *const GLvoid)>,
+        glEnableVertexAttribArray: Option<fn(index: GLuint)>,
+        glBufferData: Option<fn(target: GLenum, size: GLsizeiptr, data: *const c_void, usage: GLenum)>,
+        glBindBuffer: Option<fn(target: GLenum, buffer: GLuint)>,
+        glGetStringi:Option<fn(name: GLenum, index: GLuint) -> *const GLubyte>,
+        glGenVertexArrays: Option<fn(n: GLsizei, arrays: *const GLuint)>,
+        glBindVertexArray: Option<fn(array: GLuint)>,
+        glDeleteBuffers: Option<fn(n: GLsizei, buffers: *const GLuint)>,
+        glDeleteVertexArrays: Option<fn(n: GLsizei, arrays: *const GLuint)>,
+        //glGenTextures: Option<fn(n: GLsizei, textures: *const GLuint)>,
+        //glBindTexture: Option<fn(target: GLenum, texture: GLuint)>,
+        //glTexParameteri: Option<fn(target: GLenum, pname: GLenum, param: GLint)>,
+        //glTexImage2D: Option<fn(target: GLenum, level: GLint, internalformat: GLint, width: GLsizei, height: GLsizei, border: GLint, format: GLenum, _type: GLenum, data: *const c_void)>,
+        glDeleteTextures: Option<fn(n: GLsizei, textures: *const GLuint)>,
+        glActiveTexture: Option<fn(textures: GLenum)>,
+        glUniform1i: Option<fn(location: GLint, v0: GLint)>,
+        //glBlendFunc: Option<fn(sfactor: GLenum, dfactor: GLenum)>,
+        glUniformMatrix4fv: Option<fn(location: GLint, count: GLsizei, transpose: GLboolean, value: *const GLfloat)>,
+        glEnableVertexArrayAttrib: Option<fn(vaobj: GLuint, index: GLuint)>,
+        glBindTextureUnit: Option<fn(unit: GLuint, texture: GLuint)>,
+        glUniform1iv: Option<fn(location: GLint, count: GLsizei, value: *const GLint)>,
+        glMapBuffer: Option<fn(target: GLenum, access: GLenum)>,
+        glUnmapBuffer: Option<fn(target: GLenum) -> GLboolean>,
+        glBufferSubData: Option<fn(target: GLenum, offset: GLintptr, size: GLsizeiptr, data: *const c_void)>,
+        //glViewport: Option<fn(x: GLint, y: GLint, width: GLsizei, height: GLsizei),
     }
 }
 
@@ -368,4 +376,72 @@ impl GL {
     map_func_modern!{unmap_buffer, glUnmapBuffer: fn(target: GLenum) -> GLboolean}  
     map_func_modern!{buffer_sub_data, glBufferSubData: fn(target: GLenum, offset: GLintptr, size: GLsizeiptr, data: *const c_void)}  
     //map_func_modern!{viewport, glViewport: fn(x: GLint, y: GLint, width: GLsizei, height: GLsizei)}  
+}
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+    use crate::library::gui::glfw::*;
+    use std::ptr::null_mut;
+
+    #[test]
+    fn modern_opengl_bindings() {
+        unsafe{
+            let window: *mut GLFWwindow;
+            let monitor: *mut GLFWmonitor = null_mut();
+            let share: *mut GLFWwindow = null_mut();
+
+            if glfwInit() == 0 {
+                panic!("Failed to initialize GLFW!");
+            }
+
+            let title = CString::new("Rust chess (OpenGL)").unwrap();
+            window = glfwCreateWindow(480 as i32, 480 as i32, title.as_ptr(), monitor, share);
+            if window.is_null() {
+                glfwTerminate();
+                panic!("Failed to create GLFW window!");
+            }
+
+            glfwMakeContextCurrent(window);
+            let gl = GL::bind();
+            
+            // this function can be used as a sanity check as it's legacy opengl
+            // assert!(gl.glBlendFunc.is_none());
+
+            assert!(gl.glCreateShader.is_some());
+            assert!(gl.glGenBuffers.is_some());
+            assert!(gl.glGetUniformLocation.is_some());
+            assert!(gl.glUniform4f.is_some());
+            assert!(gl.glDeleteProgram.is_some());
+            assert!(gl.glGetShaderInfoLog.is_some());
+            assert!(gl.glGetShaderiv.is_some());
+            assert!(gl.glDeleteShader.is_some());
+            assert!(gl.glUseProgram.is_some());
+            assert!(gl.glValidateProgram.is_some());
+            assert!(gl.glLinkProgram.is_some());
+            assert!(gl.glAttachShader.is_some());
+            assert!(gl.glCompileShader.is_some());
+            assert!(gl.glShaderSource.is_some());
+            assert!(gl.glCreateProgram.is_some());
+            assert!(gl.glVertexAttribPointer.is_some());
+            assert!(gl.glEnableVertexAttribArray.is_some());
+            assert!(gl.glBufferData.is_some());
+            assert!(gl.glBindBuffer.is_some());
+            assert!(gl.glGetStringi.is_some());
+            assert!(gl.glGenVertexArrays.is_some());
+            assert!(gl.glBindVertexArray.is_some());
+            assert!(gl.glDeleteBuffers.is_some());
+            assert!(gl.glDeleteVertexArrays.is_some());
+            assert!(gl.glActiveTexture.is_some());
+            assert!(gl.glUniform1i.is_some());
+            assert!(gl.glUniformMatrix4fv.is_some());
+            assert!(gl.glEnableVertexArrayAttrib.is_some());
+            assert!(gl.glBindTextureUnit.is_some());
+            assert!(gl.glUniform1iv.is_some());
+            assert!(gl.glMapBuffer.is_some());
+            assert!(gl.glUnmapBuffer.is_some());
+            assert!(gl.glBufferSubData.is_some());
+        }   
+    }
 }

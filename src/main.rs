@@ -1,10 +1,5 @@
-use std::env;
-use std::error::Error;
-use std::process;
-
-use rust_chess::library::config::*;
-use rust_chess::library::cli;
-use rust_chess::library::gui;
+use std::{env, error::Error, process};
+use rust_chess::library::{config::*, cli, gui};
 
 fn main() {
     let config = Config::new(env::args()).unwrap_or_else(|err| {

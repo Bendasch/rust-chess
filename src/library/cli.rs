@@ -1,7 +1,5 @@
 use crate::library::game::*;
-use std::fmt;
-use std::collections::LinkedList;
-use std::io;
+use std::{fmt, collections::LinkedList, io};
 
 // somehow the black ascii chess pieces look like white and vice versa...
 // depending on the console, they made need to be swapped (again)
@@ -17,13 +15,27 @@ const BLACK_BISHOP: char  = '\u{2657}';
 const BLACK_QUEEN: char   = '\u{2655}';
 const BLACK_KING: char    = '\u{2654}';
 const BLACK_PAWN: char    = '\u{2659}';
-//const EMPTY: char         = '\u{0020}';
 
+/* 
+    This is the main function for the CLI version of the game.
+
+    The game is a linked list of board states (one for each half-move). It can be initialized using a FEN string 
+    (e.g., "rn1qk2r/pppbbppp/5n2/4p3/N2p4/1P1P4/PBPQPPPP/R3KBNR w KQkq - 3 7") if a specific position should be 
+    loaded. Otherwise a new game is created. In both cases, the game starts as a list containing one board state.
+
+    The game can be played by the user by entering a move in the form:
+        <start row index><start column index><target row index><target column index>
+    For example, the starting move "e4" would be entered as "2545". In the future parsing of moves in more intuitive
+    notation may be supported.
+*/
 pub fn run(fen: Option<String>) {
+
+    // start from a provided or an initial position
     let mut game: LinkedList<State> = LinkedList::new();
     game.push_back(State::new(fen));
-    loop {
 
+    loop {
+        // start by showing the current board state
         draw_board(game.back().unwrap().position().borrow());        
 
         // who to move?
@@ -40,19 +52,27 @@ pub fn run(fen: Option<String>) {
         let mut move_string = String::new();
         io::stdin().read_line(&mut move_string).unwrap();
         
+        // execute the move according to the players input.
+        // the resulting state is appended to the game list.
         State::perform_turn_from_input(move_string, &mut game);
     }
 }
 
 fn draw_board(position: Ref<Position>) {
+
     let split: Vec<&str> = position.split();
+
     println!("\n   1 2 3 4 5 6 7 8");
     println!("  -----------------");
+
     for (i, line) in split.iter().enumerate() {
+
         let mut output_rank = String::new();
         let rank_index = char::from_digit(8-i as u32, 10).unwrap();
+
         output_rank.push(rank_index);
         output_rank.push_str("| ");
+
         for char in line.chars() {
             match char {
                 'r' => output_rank.push(BLACK_ROOK),
@@ -79,10 +99,13 @@ fn draw_board(position: Ref<Position>) {
             }
             output_rank.push(' ');
         }
+
         output_rank.push_str(" |");
         output_rank.push(rank_index);
+
         println!("{}", output_rank);
     }
+
     println!("  -----------------");
     println!("   1 2 3 4 5 6 7 8");
 }
@@ -104,7 +127,7 @@ impl fmt::Display for Field {
 impl fmt::Display for Piece {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         
-        let color= match self.color() {
+        let color = match self.color() {
             Color::Black => "black",
             Color::White => "white",
             Color::None => panic!("Corrupt game state - each player needs a color!")

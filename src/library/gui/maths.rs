@@ -1,7 +1,6 @@
 extern crate glm;
 pub use glm::*;
 
-
 pub fn ortho(left: f32, right: f32, bottom: f32, top: f32, near: f32, far: f32) -> glm::Mat4 {
     glm::mat4(
         2.0/(right-left), 0.0, 0.0, 0.0,

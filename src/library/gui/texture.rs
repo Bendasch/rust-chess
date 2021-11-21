@@ -1,8 +1,7 @@
 extern crate image;
 use crate::gl;
-use crate::library::gui::utils::{gl_clear_errors, gl_print_errors};
+use crate::library::gui::{opengl::*, utils::{gl_clear_errors, gl_print_errors}};
 use image::*;
-use crate::library::gui::opengl::*;
 use libc::{c_void};
 use std::rc::Rc;
 
@@ -33,9 +32,7 @@ impl Texture {
         
         let raw: &Vec<u8> = img.as_raw();
         gl!(gl.tex_image_2d(GL_TEXTURE_2D, 0, GL_RGBA8, dim.0 as GLint, dim.1 as GLint, 0, GL_RGBA, GL_UNSIGNED_BYTE, raw.as_ptr() as *const c_void));
-    
-        //gl!(gl.bind_texture(GL_TEXTURE_2D, 0));
-        
+            
         Texture {
             gl,
             texture_id,
@@ -87,16 +84,4 @@ impl Drop for Texture {
             gl!(self.gl.delete_textures(1, &self.texture_id as *const GLuint));
         };
     }
-}
-
-#[cfg(test)]
-pub mod tests {
-
-    /* 
-    use super::*;
-
-    #[test]
-    fn open_image_test() {
-    }
-    */
 }
