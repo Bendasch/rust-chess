@@ -184,7 +184,7 @@ pub mod tests {
         let (vertex, _) = Shader::parse_file("./src/library/gui/res/simple.shader");
         let vertex_string = String::from(vertex.to_str().unwrap());
         let line_vec: Vec<&str> = vertex_string.split("\n").collect();
-        assert_eq!(line_vec[0].trim(), "#version 450 core");
+        assert_eq!(line_vec[0].trim(), "#version 330 core");
     }
     
     #[test]
@@ -192,6 +192,6 @@ pub mod tests {
         let (_, fragment) = Shader::parse_file("./src/library/gui/res/simple.shader");
         let fragment_string = String::from(fragment.to_str().unwrap());
         let line_vec: Vec<&str> = fragment_string.split("\n").collect();
-        assert_eq!(line_vec[0].trim(), "#version 450 core");
+        assert_eq!(line_vec[0].trim(), "#version 330 core");
     }
 }
