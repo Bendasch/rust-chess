@@ -17,7 +17,7 @@ This is demonstrated in the [CLI section](<#CLI>).
 ## GUI
 ![gui](gui.gif)
 ## CLI
-![gui](cli_load_fen.gif)
+![cli](cli.gif)
 ```
 cargo run cli
 ```
