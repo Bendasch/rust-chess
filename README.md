@@ -20,6 +20,7 @@ This is demonstrated in the [CLI section](<#CLI>).
 ![cli](cli.gif)
 
 The game can be played by the user by entering a move in the form:
+
 ```<start row><start column><target row><target column>```
 
 For example, the starting move "e4" would be entered as "2545". In the future parsing of moves in more intuitive
