@@ -1,14 +1,21 @@
-![gui](gui.gif)
-
 # Requirements
 - Windows 2000 Professional or later
 - OpenGL version 3.3 or higher
 
 # How to play
+The game can be started by running the binary crate:
+```
+cargo run <ui version>
+```
+Here `<ui version>` is either `gui` or `cli`.	
+
+Additionally, a [FEN](https://en.wikipedia.org/wiki/Forsyth%E2%80%93Edwards_Notation)-string can be loaded by passing it as an additional parameter.
+```
+cargo run <ui version> <fen>
+```	
+This is demonstrated in the [CLI section](<##CLI>).
 ## GUI
-```
-cargo run gui
-```
+![gui](gui.gif)
 ## CLI
 ```
 cargo run cli
