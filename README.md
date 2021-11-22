@@ -18,9 +18,7 @@ This is demonstrated in the [CLI section](<#CLI>).
 ![gui](gui.gif)
 ## CLI
 ![cli](cli.gif)
-```
-cargo run cli
-```
+
 The game can be played by the user by entering a move in the form:
     <start row index><start column index><target row index><target column index>
 
