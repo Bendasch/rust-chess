@@ -13,10 +13,11 @@ Additionally, a [FEN](https://en.wikipedia.org/wiki/Forsyth%E2%80%93Edwards_Nota
 ```
 cargo run <ui version> <fen>
 ```	
-This is demonstrated in the [CLI section](<##CLI>).
+This is demonstrated in the [CLI section](<#CLI>).
 ## GUI
 ![gui](gui.gif)
 ## CLI
+![gui](cli_load_fen.gif)
 ```
 cargo run cli
 ```
