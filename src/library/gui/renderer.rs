@@ -18,7 +18,6 @@ use std::{
     Currently, loads of things need to be refactored:
         - which methods need to be methods of the 'Renderer' struct?
         - how should state be passed to glfw?
-        - how can the drawing be meaningfully abstracted?
 */
 
 // TO DO: Refactor the way the renderer and game state are passed to glfw callbacks.
@@ -28,13 +27,19 @@ pub static mut HEIGHT: f32 = 768.0;
 #[allow(dead_code)]
 pub struct Renderer {
     pub gl: Rc<GL>,
-    pub window: *mut GLFWwindow,
-    shader: Shader,
-    vertex_array: VertexArray,
-    vertex_buffer: VertexBuffer,
-    index_buffer: IndexBuffer,
-    textures: Vec<Texture>,
+    pub glfw: Glfw,
     game_state: Arc<RwLock<GameState>>,
+    shader: Shader,
+    v_array: VertexArray,
+    v_buffer: VertexBuffer,
+    i_buffer: IndexBuffer,
+    textures: Vec<Texture>,
+}
+
+pub struct Glfw {
+    monitor: *mut GLFWmonitor,
+    share: *mut GLFWwindow,
+    window: *mut GLFWwindow,
 }
 
 pub struct GameState {
@@ -43,54 +48,35 @@ pub struct GameState {
 }
 
 impl Renderer {
-    // TO DO: Refactor this method...
     pub unsafe fn init(game: LinkedList<State>) -> Renderer {
-        let window: *mut GLFWwindow;
-        let monitor: *mut GLFWmonitor = null_mut();
-        let share: *mut GLFWwindow = null_mut();
-
-        if glfwInit() == 0 {
-            panic!("Failed to initialize GLFW!");
-        }
-
-        let title = CString::new("Rust chess (OpenGL)").unwrap();
-
-        window = glfwCreateWindow(WIDTH as i32, HEIGHT as i32, title.as_ptr(), monitor, share);
-        if window.is_null() {
-            glfwTerminate();
-            panic!("Failed to create GLFW window!");
-        }
-
-        glfwMakeContextCurrent(window);
-
+        let glfw = Renderer::init_glfw().expect("Failed to initialize GLFW");
         let gl = Rc::new(GL::bind());
 
-        glfwSwapInterval(1);
-
-        let vertex_buffer = VertexBuffer::new(452, Rc::clone(&gl));
-        let mut layout = VertexBufferLayout::new(vertex_buffer.buffer_id);
+        // vertex buffer
+        let v_buffer = VertexBuffer::new(452, Rc::clone(&gl));
+        let mut layout = VertexBufferLayout::new(v_buffer.buffer_id);
         layout.push::<f32>(2);
         layout.push::<f32>(2);
         layout.push::<f32>(1);
 
-        let mut vertex_array = VertexArray::new(Rc::clone(&gl));
-        vertex_array.add_buffer(&vertex_buffer, &layout);
+        // vertex array
+        let mut v_array = VertexArray::new(Rc::clone(&gl));
+        v_array.add_buffer(&v_buffer, &layout);
 
-        let vertices = Renderer::get_board_vertices(&None);
-        vertex_buffer.bind();
-        vertex_buffer.buffer_sub_data(&vertices, vertices.len(), 0);
-
+        // indices
         let board_indices = Renderer::get_board_indices();
-        let index_buffer = IndexBuffer::new(576, Rc::clone(&gl));
-        index_buffer.bind();
-        index_buffer.buffer_sub_data(&board_indices, board_indices.len(), 0);
+        let i_buffer = IndexBuffer::new(576, Rc::clone(&gl));
+        i_buffer.bind();
+        i_buffer.buffer_sub_data(&board_indices, board_indices.len(), 0);
 
+        // shader
         let mut shader = Shader::new(
             String::from("./src/library/gui/res/simple.shader"),
             Rc::clone(&gl),
         );
-        shader.bind();
 
+        // textures
+        shader.bind();
         let white_field = Texture::new("./src/library/gui/res/img/white_field.png", Rc::clone(&gl));
         let black_field = Texture::new("./src/library/gui/res/img/black_field.png", Rc::clone(&gl));
         let pieces = Texture::new("./src/library/gui/res/img/pieces.png", Rc::clone(&gl));
@@ -98,74 +84,120 @@ impl Renderer {
 
         Renderer::set_blend_func(Rc::clone(&gl));
 
-        vertex_array.unbind();
-        vertex_buffer.unbind();
-        index_buffer.unbind();
-        shader.unbind();
-
         // "bind" the game state to the glfw window
         let game_state = Arc::new(RwLock::new(GameState {
             selected_field: None,
             game,
         }));
 
-        glfwSetWindowUserPointer(window, Arc::as_ptr(&game_state) as *const c_void);
+        glfwSetWindowUserPointer(glfw.window, Arc::as_ptr(&game_state) as *const c_void);
 
         Renderer {
             gl,
-            window,
-            vertex_array,
-            vertex_buffer,
-            index_buffer,
+            glfw,
+            game_state,
+            v_array,
+            v_buffer,
+            i_buffer,
             shader,
             textures: vec![white_field, black_field, pieces],
-            game_state,
         }
     }
 
-    pub unsafe fn clear(&self) {
-        gl!(self.gl.clear(GL_COLOR_BUFFER_BIT));
+    fn init_glfw() -> Option<Glfw> {
+        unsafe {
+            if glfwInit() == 0 {
+                return None;
+            }
+
+            let mut glfw = Glfw {
+                monitor: null_mut(),
+                share: null_mut(),
+                window: null_mut(),
+            };
+
+            let title = CString::new("Rust chess (OpenGL)").unwrap();
+
+            glfw.window = glfwCreateWindow(
+                WIDTH as i32,
+                HEIGHT as i32,
+                title.as_ptr(),
+                glfw.monitor,
+                glfw.share,
+            );
+
+            if glfw.window.is_null() {
+                glfwTerminate();
+                return None;
+            }
+
+            glfwMakeContextCurrent(glfw.window);
+            glfwSwapInterval(1);
+            Some(glfw)
+        }
     }
 
-    // TO DO: Refactor this method...
-    pub unsafe fn update(&mut self) {
+    pub fn get_window(&self) -> *mut GLFWwindow {
+        self.glfw.window
+    }
+
+    pub fn clear(&self) {
+        self.v_array.unbind();
+        self.v_buffer.unbind();
+        self.i_buffer.unbind();
+        self.shader.unbind();
+        unsafe {
+            gl!(self.gl.clear(GL_COLOR_BUFFER_BIT));
+        }
+    }
+
+    pub fn draw(&mut self) {
+        unsafe {
+            self.set_view();
+        }
+        self.bind_textures();
+        self.bind_board_state();
+        self.draw_call();
+        // TO DO: Draw who to move.
+    }
+
+    unsafe fn set_view(&mut self) {
         let mvp = ortho(0.0, WIDTH, 0.0, HEIGHT, -0.5, 0.5);
         self.shader.bind();
         self.shader.set_uniform_mat4f("u_MVP", mvp);
         gl!(self.gl.viewport(0, 0, WIDTH as i32, HEIGHT as i32));
     }
 
-    // TO DO: Refactor this method...
-    pub unsafe fn draw(&self) {
-        self.shader.bind();
+    fn draw_call(&self) {
+        unsafe {
+            self.v_array.bind();
+            gl!(self.gl.draw_elements(
+                GL_TRIANGLES,
+                *self.i_buffer.get_index_count(),
+                GL_UNSIGNED_INT,
+                null_mut::<c_void>()
+            ));
+        }
+    }
+
+    fn bind_board_state(&self) {
+        self.v_buffer.bind();
+        let game_state = self.game_state.read().unwrap();
+        let b_verts = Renderer::get_board_vertices(&game_state.selected_field);
+        self.v_buffer.buffer_sub_data(&b_verts, b_verts.len(), 0);
+        unsafe {
+            let pos_matrix = game_state.game.back().unwrap().position_matrix().borrow();
+            let (p_verts, p_inds) = Renderer::get_piece_vertices_and_indices(pos_matrix);
+            self.v_buffer.buffer_sub_data(&p_verts, p_verts.len(), 324);
+            self.i_buffer.bind();
+            self.i_buffer.buffer_sub_data(&p_inds, p_inds.len(), 384);
+        }
+    }
+
+    fn bind_textures(&self) {
         for (i, texture) in self.textures.iter().enumerate() {
             texture.bind_texture_unit(i as u32);
         }
-
-        // bind the actual board state
-        let game_state = self.game_state.read().unwrap();
-        let vertices = Renderer::get_board_vertices(&game_state.selected_field);
-        let (piece_vertices, piece_indices) = Renderer::get_piece_vertices_and_indices(
-            game_state.game.back().unwrap().position_matrix().borrow(),
-        );
-        drop(game_state);
-        self.vertex_buffer.bind();
-        self.vertex_buffer
-            .buffer_sub_data(&vertices, vertices.len(), 0);
-        self.vertex_buffer
-            .buffer_sub_data(&piece_vertices, piece_vertices.len(), 324);
-
-        self.index_buffer.bind();
-        self.index_buffer
-            .buffer_sub_data(&piece_indices, piece_indices.len(), 384);
-
-        self.vertex_array.bind();
-        gl!(self.gl.draw_elements(
-            GL_TRIANGLES,
-            *self.index_buffer.get_index_count(),
-            GL_UNSIGNED_INT,
-            null_mut::<c_void>()
-        ));
     }
 
     pub unsafe fn set_blend_func(gl: Rc<GL>) {
@@ -173,44 +205,15 @@ impl Renderer {
         gl!(gl.enable(GL_BLEND));
     }
 
-    // TO DO: Move creation of one vertex into own method!
-    pub unsafe fn get_board_vertices(selected_field: &Option<(usize, usize)>) -> Vec<f32> {
+    pub fn get_board_vertices(selected_field: &Option<(usize, usize)>) -> Vec<f32> {
         let mut vertices = Vec::new();
         for i in 0..=8 {
             for j in 0..=8 {
-                let mut texture_id: f32;
-
-                // upper right square
-                texture_id = ((i + j + 1) % 2) as f32;
-                vertices.push(Vertex {
-                    position: Position(i as f32 * WIDTH / 8.0, j as f32 * HEIGHT / 8.0),
-                    texture_coords: TextureCoords(0.0, 0.0),
-                    texture_id,
-                });
-
-                // upper left square
-                texture_id = ((i + j) % 2) as f32;
-                vertices.push(Vertex {
-                    position: Position(i as f32 * WIDTH / 8.0, j as f32 * HEIGHT / 8.0),
-                    texture_coords: TextureCoords(1.0, 0.0),
-                    texture_id,
-                });
-
-                // lower left square
-                texture_id = ((i + j + 1) % 2) as f32;
-                vertices.push(Vertex {
-                    position: Position(i as f32 * WIDTH / 8.0, j as f32 * HEIGHT / 8.0),
-                    texture_coords: TextureCoords(1.0, 1.0),
-                    texture_id,
-                });
-
-                // lower right square
-                texture_id = ((i + j) % 2) as f32;
-                vertices.push(Vertex {
-                    position: Position(i as f32 * WIDTH / 8.0, j as f32 * HEIGHT / 8.0),
-                    texture_coords: TextureCoords(0.0, 1.0),
-                    texture_id,
-                });
+                for k in 1..=4 {
+                    unsafe {
+                        vertices.push(Renderer::get_vertex(i, j, k));
+                    }
+                }
             }
         }
 
@@ -222,6 +225,30 @@ impl Renderer {
         };
 
         Renderer::deserialize(vertices)
+    }
+
+    unsafe fn get_vertex(rank: i32, file: i32, corner: i32) -> Vertex {
+        let position = Position(rank as f32 * WIDTH / 8.0, file as f32 * HEIGHT / 8.0);
+
+        let texture_coords = match corner {
+            1 => TextureCoords(0.0, 0.0),
+            2 => TextureCoords(1.0, 0.0),
+            3 => TextureCoords(1.0, 1.0),
+            4 => TextureCoords(0.0, 1.0),
+            _ => panic!("Invalid corner index"),
+        };
+
+        let texture_id = match corner {
+            1 | 3 => ((rank + file + 1) % 2) as f32,
+            2 | 4 => ((rank + file) % 2) as f32,
+            _ => panic!("Invalid corner index"),
+        };
+
+        Vertex {
+            position,
+            texture_coords,
+            texture_id,
+        }
     }
 
     fn get_board_indices() -> Vec<u32> {

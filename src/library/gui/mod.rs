@@ -24,28 +24,13 @@ pub unsafe fn run(fen: Option<String>) {
     print_opengl_version(&renderer.gl);
     //print_opengl_extensions(&renderer.gl);
 
-    glfwSetMouseButtonCallback(renderer.window, click_callback);
-    glfwSetFramebufferSizeCallback(renderer.window, framebuffer_size_callback);
+    glfwSetMouseButtonCallback(renderer.get_window(), click_callback);
+    glfwSetFramebufferSizeCallback(renderer.get_window(), framebuffer_size_callback);
 
-    while glfwWindowShouldClose(renderer.window) == 0 {
+    while glfwWindowShouldClose(renderer.get_window()) == 0 {
         renderer.clear();
-
-        /*
-        // TO DO: Draw who to move.
-        match game.back().unwrap().check_game_over() {
-            GameOver::BlackWon => {println!("Checkmate, black won!"); return},
-            GameOver::WhiteWon => {println!("Checkmate, white won!"); return},
-            GameOver::Stalemate => {println!("Stalemate!"); return},
-            _ => draw_who_to_move(game.back().unwrap().turn())
-        }
-        */
-
-        renderer.update();
-
         renderer.draw();
-
-        glfwSwapBuffers(renderer.window);
-
+        glfwSwapBuffers(renderer.get_window());
         glfwPollEvents();
     }
 
