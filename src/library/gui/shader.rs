@@ -45,7 +45,7 @@ impl Shader {
         gl!(gl.delete_shader(vert_shader_id));
         gl!(gl.delete_shader(frag_shader_id));
 
-        Shader{ gl, shader_id: program, file_path: file_path, uniforms: HashMap::new() }
+        Shader{ gl, shader_id: program, file_path, uniforms: HashMap::new() }
     }
 
     pub fn get_id(&self) -> &c_uint {
@@ -90,15 +90,15 @@ impl Shader {
             return 0;
         }
         
-        return id;
+        id
     }
 
     fn parse_file(file_path: &str) -> (CString, CString) {
         
         //let shader_file_name: &str = "./src/library/opengl/simple.shader";
-        let mut file = File::open(file_path).expect(format!("Couldn't read shader file {}", file_path).as_str());
+        let mut file = File::open(file_path).unwrap_or_else(|_| panic!("Couldn't read shader file {}", file_path));
         let mut contents = String::new();
-        file.read_to_string(&mut contents).expect(format!("Couldn't read contents of file {}", file_path).as_str());
+        file.read_to_string(&mut contents).unwrap_or_else(|_| panic!("Couldn't read contents of file {}", file_path));
         let lines: Vec<&str> = contents.split("\n").collect(); 
         
         let (mut vert_shader_str, mut frag_shader_str) = (String::new(), String::new());
@@ -115,8 +115,8 @@ impl Shader {
                 continue;
             }
             match mode {
-                ShaderType::Vertex => { vert_shader_str.push_str(line); vert_shader_str.push_str("\n"); },
-                ShaderType::Fragment => { frag_shader_str.push_str(line); frag_shader_str.push_str("\n"); },
+                ShaderType::Vertex => { vert_shader_str.push_str(line); vert_shader_str.push('\n'); },
+                ShaderType::Fragment => { frag_shader_str.push_str(line); frag_shader_str.push('\n'); },
                 ShaderType::None => continue
             }
         }

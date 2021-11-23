@@ -114,7 +114,7 @@ fn draw_who_to_move(turn: &Color) {
     match *turn {
         Color::Black => println!("Black to move..."),
         Color::White => println!("White to move..."),
-        _ => return
+        _ => {}
     }
 }
 

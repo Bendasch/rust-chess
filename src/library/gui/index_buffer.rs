@@ -43,6 +43,6 @@ impl IndexBuffer {
 
 impl Drop for IndexBuffer {
     fn drop(&mut self) {
-        self.gl.delete_buffers(1, &mut self.buffer_id);
+        self.gl.delete_buffers(1, &self.buffer_id);
     }
 }

@@ -342,7 +342,7 @@ impl GL {
     map_func_modern!{uniform_4f, glUniform4f: fn(location: GLint, v0: GLfloat, v1: GLfloat, v2: GLfloat, v3: GLfloat)}
     map_func_modern!{delete_program, glDeleteProgram: fn(program: GLuint)}
     map_func_modern!{get_shader_infolog, glGetShaderInfoLog: fn(shader: GLuint, maxLength: GLsizei, length: *mut GLsizei, infoLog: *mut GLchar)}
-    map_func_modern!{get_shaderiv, glGetShaderiv: fn(shader: GLuint, pname: GLenum, params: *const GLint)}
+    map_func_modern!{get_shaderiv, glGetShaderiv: fn(shader: GLuint, pname: GLenum, params: *mut GLint)}
     map_func_modern!{delete_shader, glDeleteShader: fn(shader: GLuint)}
     map_func_modern!{use_program, glUseProgram: fn(program: GLuint)}
     map_func_modern!{validate_program, glValidateProgram: fn(program: GLuint)}
@@ -356,7 +356,7 @@ impl GL {
     map_func_modern!{buffer_data, glBufferData: fn(target: GLenum, size: GLsizeiptr, data: *const c_void, usage: GLenum)}
     map_func_modern!{bind_buffer, glBindBuffer: fn(target: GLenum, buffer: GLuint)}
     map_func_modern!{get_stringi, glGetStringi:fn(name: GLenum, index: GLuint) -> *const GLubyte}
-    map_func_modern!{gen_vertex_arrays, glGenVertexArrays: fn(n: GLsizei, arrays: *const GLuint)}
+    map_func_modern!{gen_vertex_arrays, glGenVertexArrays: fn(n: GLsizei, arrays: *mut GLuint)}
     map_func_modern!{bind_vertex_array, glBindVertexArray: fn(array: GLuint)}
     map_func_modern!{delete_buffers, glDeleteBuffers: fn(n: GLsizei, buffers: *const GLuint)}  
     map_func_modern!{delete_vertex_arrays, glDeleteVertexArrays: fn(n: GLsizei, arrays: *const GLuint)}

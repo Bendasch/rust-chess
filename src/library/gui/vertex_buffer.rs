@@ -42,7 +42,7 @@ impl VertexBuffer {
 
 impl Drop for VertexBuffer {
     fn drop(&mut self) {
-        self.gl.delete_buffers(1, &mut self.buffer_id);
+        self.gl.delete_buffers(1, &self.buffer_id);
     }
 }
 
@@ -112,25 +112,18 @@ pub struct Vertex {
 
 impl Vertex {
     pub fn deserialize(&mut self) -> Vec<f32> {
-        let mut vec = Vec::new();
-        vec.push(self.position.0);
-        vec.push(self.position.1);
-        vec.push(self.texture_coords.0);
-        vec.push(self.texture_coords.1);
-        vec.push(self.texture_id);
-        vec
-        /*
-        vec.push(self.position.2);
-        vec.push(self.color.0);
-        vec.push(self.color.1);
-        vec.push(self.color.2);
-        vec.push(self.color.3);
-        */
+        vec![
+            self.position.0,
+            self.position.1,
+            self.texture_coords.0,
+            self.texture_coords.1,
+            self.texture_id
+        ]
     }
 }
 
 #[cfg(debug_assertions)]
-pub fn print_vertices(vertices: &Vec<f32>) {
+pub fn print_vertices(vertices: &[f32]) {
     println!("------ NEW FRAME ------");
     for i in 0..vertices.len() / 5 {
         print!("x: {:?}", vertices[i*5]);

@@ -162,7 +162,7 @@ impl Renderer {
         self.index_buffer.buffer_sub_data(piece_indices.as_ptr() as *const c_void, piece_indices.len(), 384);
         
         self.vertex_array.bind();    
-        gl!(self.gl.draw_elements(GL_TRIANGLES, *self.index_buffer.get_index_count(), GL_UNSIGNED_INT, 0 as *mut c_void));
+        gl!(self.gl.draw_elements(GL_TRIANGLES, *self.index_buffer.get_index_count(), GL_UNSIGNED_INT, null_mut::<c_void>()));
     }
     
     pub unsafe fn set_blend_func(gl: Rc<GL>) {
@@ -213,14 +213,11 @@ impl Renderer {
             }
         }
 
-        match *selected_field {
-            Some((x,y)) => { 
-                let selected_field_indices = Renderer::get_board_indices_for_field(x, y);
-                for index in selected_field_indices {
-                    vertices[index].texture_id = 3.0;
-                }
+        if let Some((x,y)) = *selected_field {
+            let selected_field_indices = Renderer::get_board_indices_for_field(x, y);
+            for index in selected_field_indices {
+                vertices[index].texture_id = 3.0;
             }
-            None => {},
         };
 
         Renderer::deserialize(vertices)
@@ -243,14 +240,13 @@ impl Renderer {
     }
 
     fn get_board_indices_for_field(x: usize, y: usize) -> Vec<usize> {
-        let mut indices = Vec::new();
-        indices.push(36*x       + 4*y);
-        indices.push(36*(x+1)   + 4*y     + 1);
-        indices.push(36*(x+1)   + 4*(y+1) + 2);
-        indices.push(36*(x+1)   + 4*(y+1) + 2);
-        indices.push(36*x       + 4*(y+1) + 3);
-        indices.push(36*x       + 4*y); 
-        indices
+        vec![
+            36*(x+1)   + 4*y     + 1,
+            36*(x+1)   + 4*(y+1) + 2,
+            36*(x+1)   + 4*(y+1) + 2,
+            36*x       + 4*(y+1) + 3,
+            36*x       + 4*y, 
+        ]
     }
 
     fn deserialize(vertices: Vec<Vertex>) -> Vec<f32> {
@@ -271,7 +267,7 @@ impl Renderer {
 
                 if piece.piecetype() == &PieceType::None { continue; }
 
-                let (u, v) = Renderer::get_texture_coords_from_piece(&piece);
+                let (u, v) = Renderer::get_texture_coords_from_piece(piece);
                 vertices.push(Vertex {
                     position: Position(j as f32 * WIDTH / 8.0, i as f32 * HEIGHT / 8.0),
                     texture_coords: TextureCoords(u, v),
@@ -343,16 +339,14 @@ impl Renderer {
 pub extern fn click_callback(window: *const GLFWwindow, button: c_int, action: c_int, _mods: c_int) {
     if action == GLFW_PRESS {
         match button {
-            GLFW_MOUSE_BUTTON_LEFT =>  {
-                unsafe {
-                    let (x, y) = Renderer::get_clicked_field(window);
-                    toggle_field(glfwGetWindowUserPointer(window), (x, y)); 
-                }
+            GLFW_MOUSE_BUTTON_LEFT =>  unsafe {
+                let (x, y) = Renderer::get_clicked_field(window);
+                toggle_field(glfwGetWindowUserPointer(window), (x, y)); 
             },
-            GLFW_MOUSE_BUTTON_RIGHT => {
-                unsafe { deselected_field(glfwGetWindowUserPointer(window)); }
+            GLFW_MOUSE_BUTTON_RIGHT => unsafe {
+                deselected_field(glfwGetWindowUserPointer(window));
             },
-            _ => return,
+            _ => {},
         }
     }
 }

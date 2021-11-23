@@ -121,9 +121,9 @@ impl Move {
     // -> 2545 is equivalent to "e4" in standard notation.
     fn new(start_field: &Field, target_field: &Field, position_matrix: Ref<PositionMatrix>) -> Move {
 
-        let piece = position_matrix.get_piece_on_field(&start_field);
+        let piece = position_matrix.get_piece_on_field(start_field);
         Move {
-            piece: piece,
+            piece,
             start_field: start_field.clone(),
             target_field: target_field.clone()
         }
@@ -135,7 +135,7 @@ pub struct Position(String);
 
 impl <'a> Position {
     pub fn split(&'a self) -> Vec<&'a str> {
-        self.0.split("/").collect()
+        self.0.split('/').collect()
     }
 
     pub fn update_from_matrix(&mut self, matrix: Ref<PositionMatrix>) {
@@ -159,7 +159,7 @@ impl <'a> Position {
                     PieceType::Pawn => new_char = 'p',
                     PieceType::None => {
                         if numbers.iter().any(|n| n==&new_char) {
-                            new_char = char::from_digit(new_position.pop().unwrap().to_digit(10).unwrap() + 1 as u32, 10).unwrap();
+                            new_char = char::from_digit(new_position.pop().unwrap().to_digit(10).unwrap() + 1_u32, 10).unwrap();
                         } else {
                             new_char = '1';
                         }
@@ -186,15 +186,15 @@ impl PositionMatrix {
     }
 
     fn get_piece_on_field(&self, field: &Field) -> Piece {
-        self.0[field.0][field.1].clone()
+        self.0[field.0][field.1]
     }
 
     fn get_color_of_piece_on_field(&self, field: &Field) -> &Color {
-        &self.0[field.0][field.1].color()
+        self.0[field.0][field.1].color()
     }
 
     fn get_type_of_piece_on_field(&self, field: &Field) -> &PieceType {
-        &self.0[field.0][field.1].piecetype()
+        self.0[field.0][field.1].piecetype()
     }
 
     fn remove_piece_from_field(&mut self, field: &Field) -> Piece {
@@ -345,7 +345,7 @@ impl<'a> State {
 
     fn push_none(rank: &mut Vec<Piece>, num: usize) {
         match num {
-            0 => return,
+            0 => {},
             _ => {  
                 rank.push(Piece{color: Color::None, piecetype: PieceType::None}); 
                 State::push_none(rank, num-1)
@@ -412,9 +412,9 @@ impl<'a> State {
         }
 
         if self.turn() == &Color::White {
-            return GameOver::BlackWon
+            GameOver::BlackWon
         } else {
-            return GameOver::WhiteWon
+            GameOver::WhiteWon
         }            
     }
 
@@ -617,9 +617,9 @@ impl<'a> State {
         // for all fields in the kings path
         // check whether an enemy piece is attacking it
         // note that the target field is _not_ checked!
-        let enemy_color: Color = match self.turn() {
-            &Color::White => Color::Black,
-            &Color::Black => Color::White,
+        let enemy_color: Color = match *self.turn() {
+            Color::White => Color::Black,
+            Color::Black => Color::White,
             _ => panic!("No valid player color requested!")
         };
         let direction = file_diff / file_diff_abs;
@@ -629,7 +629,7 @@ impl<'a> State {
                 return true;
             }
         }
-        return false;
+        false
     }
     
     fn is_players_piece_attacking_field(&self, player: &Color, field: &Field) -> bool {
@@ -642,7 +642,8 @@ impl<'a> State {
                 } 
 
                 let chess_move = Move::new(&Field(i,j), field, self.position_matrix().borrow());   
-                if State::piece_can_reach_target_field(&self, &chess_move) && State::piece_has_path_to_target_field(&self, &chess_move) { 
+                if State::piece_can_reach_target_field(self, &chess_move)
+                 && State::piece_has_path_to_target_field(self, &chess_move) { 
                     return true;
                 }
             }
@@ -750,9 +751,9 @@ impl<'a> State {
         }
 
         // the en passant field is the field between the pawns starting and target field 
-        self.en_passant = match self.turn() {
-            &Color::White => Some(Field(chess_move.start_field().0 + 1, chess_move.start_field().1)),
-            &Color::Black => Some(Field(chess_move.start_field().0 - 1, chess_move.start_field().1)),
+        self.en_passant = match *self.turn() {
+            Color::White => Some(Field(chess_move.start_field().0 + 1, chess_move.start_field().1)),
+            Color::Black => Some(Field(chess_move.start_field().0 - 1, chess_move.start_field().1)),
             _ => panic!("Invalid game state, no turn. {:?}", self)
         };        
     }
@@ -789,7 +790,6 @@ impl<'a> State {
             } else {
                 self.castle_availability.white_king = false;
             }
-            return;
         } 
     }
 
@@ -819,10 +819,10 @@ impl<'a> State {
             _ => color
         };
 
-        let enemy_color: Color = match player_color {
-            &Color::White => Color::Black,
-            &Color::Black => Color::White,
-            &Color::None => panic!("Corrupt game state, no turn. State: {:?}", self)
+        let enemy_color: Color = match *player_color {
+            Color::White => Color::Black,
+            Color::Black => Color::White,
+            Color::None => panic!("Corrupt game state, no turn. State: {:?}", self)
         };
 
         let king_field: Field = State::get_king_field(self.position_matrix().borrow(), player_color).unwrap();
