@@ -1,5 +1,5 @@
 extern crate glm;
-pub use glm::*;
+pub use glm::{mat4, Mat4};
 
 #[rustfmt::skip]
 pub fn ortho(l: f32, r: f32, b: f32, t: f32, n: f32, f: f32) -> glm::Mat4 {
