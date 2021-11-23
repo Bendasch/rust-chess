@@ -1,6 +1,6 @@
+use libc::{c_char, c_float, c_int, c_uchar, c_uint, c_void};
 #[allow(unused_imports)]
 use std::{ffi::CString, mem::transmute, ptr};
-use libc::{c_int, c_uint, c_char, c_uchar, c_float, c_void};
 
 /*
     WGL FUNCTION POINTERS
@@ -11,7 +11,7 @@ extern "C" {
     pub fn wglGetCurrentContext() -> *const c_char;
 }
 
-/* 
+/*
     UTILITY TO CLEAN UP FUNCTION BINDING
 */
 pub unsafe fn get_function_pointer(name: &str) -> *const () {
@@ -21,9 +21,9 @@ pub unsafe fn get_function_pointer(name: &str) -> *const () {
 
 macro_rules! bind {
     (pub struct GL {
-        $($name:ident: Option<fn($( $param:ident: $typ:ty ),*) $(-> $ret:ty)*>),* $(,)* 
+        $($name:ident: Option<fn($( $param:ident: $typ:ty ),*) $(-> $ret:ty)*>),* $(,)*
     }) => {
-        
+
         #[allow(non_snake_case)]
         pub struct GL {
             $(pub $name: Option<fn($( $param: $typ ),*) $(-> $ret)*>),*
@@ -31,10 +31,10 @@ macro_rules! bind {
 
         #[allow(non_snake_case)]
         impl GL {
-        
+
             pub unsafe fn bind() -> GL {
                 GL {
-                    $(                      
+                    $(
                         $name: match get_function_pointer(stringify!($name)) {
                             ptr if ptr.cast::<i32>().is_null() => None,
                             ptr => Some(transmute::<*const (), fn($( $param: $typ ),*) $(-> $ret)*> (ptr)),
@@ -49,7 +49,7 @@ macro_rules! bind {
 macro_rules! map_func_modern {
     ($fn:ident, $glname:ident: fn($( $param:ident: $typ:ty ),*)) => {
         #[inline(always)]
-        pub fn $fn(&self, $( $param: $typ ),*) {
+        pub unsafe fn $fn(&self, $( $param: $typ ),*) {
             match self.$glname {
                 Some(func) => (func)($( $param ),*),
                 None => panic!("Function {} could not be bound in the current OpenGL context.", stringify!($glname)),
@@ -58,7 +58,7 @@ macro_rules! map_func_modern {
     };
     ($fn:ident, $glname:ident: fn($( $param:ident: $typ:ty ),*) $(-> $ret:ty)*) => {
         #[inline(always)]
-        pub fn $fn(&self, $( $param: $typ ),*) $(-> $ret)* {
+        pub unsafe fn $fn(&self, $( $param: $typ ),*) $(-> $ret)* {
             match self.$glname {
                 Some(func) => (func)($( $param ),*),
                 None => panic!("Function {} could not be bound in the current OpenGL context.", stringify!($glname)),
@@ -98,7 +98,7 @@ pub type GLvoid = c_void;
 pub type GLboolean = c_char;
 pub type GLchar = c_char;
 
-/* 
+/*
     OPENGL CONSTANTS
 */
 pub const GL_VERSION: GLenum = 0x1F02;
@@ -114,16 +114,16 @@ pub const GL_COLOR_BUFFER_BIT: GLenum = 0x00004000;
 pub const GL_DEPTH_BUFFER_BIT: GLenum = 0x00000100;
 pub const GL_ACCUM_BUFFER_BIT: GLenum = 0x00000200;
 pub const GL_STENCIL_BUFFER_BIT: GLenum = 0x00000400;
-pub const GL_POINTS: GLenum = 0x0000; 
-pub const GL_LINES: GLenum = 0x0001; 
-pub const GL_LINE_LOOP: GLenum = 0x0002; 
-pub const GL_LINE_STRIP: GLenum = 0x0003; 
-pub const GL_TRIANGLES: GLenum = 0x0004; 
-pub const GL_TRIANGLE_STRIP: GLenum = 0x0005; 
-pub const GL_TRIANGLE_FAN: GLenum = 0x0006; 
-pub const GL_QUADS: GLenum = 0x0007; 
-pub const GL_QUAD_STRIP: GLenum = 0x0008; 
-pub const GL_POLYGON: GLenum = 0x0009; 
+pub const GL_POINTS: GLenum = 0x0000;
+pub const GL_LINES: GLenum = 0x0001;
+pub const GL_LINE_LOOP: GLenum = 0x0002;
+pub const GL_LINE_STRIP: GLenum = 0x0003;
+pub const GL_TRIANGLES: GLenum = 0x0004;
+pub const GL_TRIANGLE_STRIP: GLenum = 0x0005;
+pub const GL_TRIANGLE_FAN: GLenum = 0x0006;
+pub const GL_QUADS: GLenum = 0x0007;
+pub const GL_QUAD_STRIP: GLenum = 0x0008;
+pub const GL_POLYGON: GLenum = 0x0009;
 pub const GL_BYTE: GLenum = 0x1400;
 pub const GL_UNSIGNED_BYTE: GLenum = 0x1401;
 pub const GL_SHORT: GLenum = 0x1402;
@@ -132,7 +132,7 @@ pub const GL_INT: GLenum = 0x1404;
 pub const GL_UNSIGNED_INT: GLenum = 0x1405;
 pub const GL_FLOAT: GLenum = 0x1406;
 pub const GL_EXTENSIONS: GLenum = 0x1F03;
-pub const GL_ARRAY_BUFFER: GLenum = 0x8892;    
+pub const GL_ARRAY_BUFFER: GLenum = 0x8892;
 pub const GL_ELEMENT_ARRAY_BUFFER: GLenum = 0x8893;
 pub const GL_STREAM_DRAW: GLenum = 0x88E0;
 pub const GL_STREAM_READ: GLenum = 0x88E1;
@@ -141,8 +141,8 @@ pub const GL_STATIC_DRAW: GLenum = 0x88E4;
 pub const GL_STATIC_READ: GLenum = 0x88E5;
 pub const GL_STATIC_COPY: GLenum = 0x88E6;
 pub const GL_DYNAMIC_DRAW: GLenum = 0x88E8;
-pub const GL_DYNAMIC_READ: GLenum = 0x88E9; 
-pub const GL_DYNAMIC_COPY: GLenum = 0x88EA;      
+pub const GL_DYNAMIC_READ: GLenum = 0x88E9;
+pub const GL_DYNAMIC_COPY: GLenum = 0x88EA;
 pub const GL_FRAGMENT_SHADER: GLenum = 0x8B30;
 pub const GL_VERTEX_SHADER: GLenum = 0x8B31;
 pub const GL_DELETE_STATUS: GLenum = 0x8B80;
@@ -233,16 +233,16 @@ pub const GL_BLEND_DST: GLenum = 0x0BE0;
 pub const GL_BLEND_SRC: GLenum = 0x0BE1;
 pub const GL_BLEND: GLenum = 0x0BE2;
 
-/* 
+/*
     OPENGL LEGACY FUNCTION POINTERS
-    > linked to Opengl32.dll 
+    > linked to Opengl32.dll
 */
 #[link(name = "Opengl32")]
 extern "C" {
     pub fn glClear(mask: GLbitfield);
-    pub fn glBegin(mode: GLenum );
+    pub fn glBegin(mode: GLenum);
     pub fn glEnd();
-    pub fn glVertex2f(x: GLfloat, y: GLfloat); 
+    pub fn glVertex2f(x: GLfloat, y: GLfloat);
     pub fn glGetIntegerv(pname: GLenum, data: *mut GLint);
     pub fn glGetString(name: GLenum) -> *const GLubyte;
     pub fn glDrawArrays(mode: GLenum, first: GLint, count: GLsizei);
@@ -251,14 +251,24 @@ extern "C" {
     pub fn glTexParameteri(target: GLenum, pname: GLenum, param: GLint);
     pub fn glGenTextures(n: GLsizei, textures: *const GLuint);
     pub fn glBindTexture(target: GLenum, texture: GLuint);
-    pub fn glTexImage2D(target: GLenum, level: GLint, internalformat: GLint, width: GLsizei, height: GLsizei, border: GLint, format: GLenum, _type: GLenum, data: *const c_void);
+    pub fn glTexImage2D(
+        target: GLenum,
+        level: GLint,
+        internalformat: GLint,
+        width: GLsizei,
+        height: GLsizei,
+        border: GLint,
+        format: GLenum,
+        _type: GLenum,
+        data: *const c_void,
+    );
     pub fn glDeleteTextures(n: GLsizei, textures: *const GLuint);
     pub fn glBlendFunc(sfactor: GLenum, dfactor: GLenum);
     pub fn glEnable(cap: GLenum);
     pub fn glViewport(x: GLint, y: GLint, width: GLsizei, height: GLsizei);
 }
 
-bind!{
+bind! {
     pub struct GL {
 
         /*
@@ -310,72 +320,70 @@ bind!{
 
 #[allow(non_snake_case)]
 impl GL {
-    
-    /* 
+    /*
         Legacy functions
     */
-    map_func_legacy!{clear, glClear: fn(mask: GLbitfield)}
-    map_func_legacy!{begin, glBegin: fn(mode: GLenum )}
-    map_func_legacy!{end, glEnd: fn()}
-    map_func_legacy!{vertex_2f, glVertex2f: fn(x: GLfloat, y: GLfloat)} 
-    map_func_legacy!{get_integerv, glGetIntegerv: fn(pname: GLenum, data: *mut GLint)}
-    map_func_legacy!{get_string, glGetString: fn(name: GLenum) -> *const GLubyte}
-    map_func_legacy!{draw_elements, glDrawElements: fn(mode: GLenum, count: GLsizei, _type: GLenum, indices: *const GLvoid)}
-    map_func_legacy!{draw_arrays, glDrawArrays: fn(mode: GLenum, first: GLint, count: GLsizei)}
-    map_func_legacy!{get_error, glGetError: fn() -> GLenum}  
-    map_func_legacy!{tex_parameter_i, glTexParameteri: fn(target: GLenum, pname: GLenum, param: GLint)}  
-    map_func_legacy!{gen_textures, glGenTextures: fn(n: GLsizei, textures: *const GLuint)}  
-    map_func_legacy!{bind_texture, glBindTexture: fn(target: GLenum, texture: GLuint)}  
-    map_func_legacy!{tex_image_2d, glTexImage2D: fn(target: GLenum, level: GLint, internalformat: GLint, width: GLsizei, height: GLsizei, border: GLint, format: GLenum, _type: GLenum, data: *const c_void)}  
-    map_func_legacy!{delete_textures, glDeleteTextures: fn(n: GLsizei, textures: *const GLuint)}  
-    map_func_legacy!{blend_func, glBlendFunc: fn(sfactor: GLenum, dfactor: GLenum)}  
-    map_func_legacy!{enable, glEnable: fn(cap: GLenum)}  
-    map_func_legacy!{viewport, glViewport: fn(x: GLint, y: GLint, width: GLsizei, height: GLsizei)}  
-    
+    map_func_legacy! {clear, glClear: fn(mask: GLbitfield)}
+    map_func_legacy! {begin, glBegin: fn(mode: GLenum )}
+    map_func_legacy! {end, glEnd: fn()}
+    map_func_legacy! {vertex_2f, glVertex2f: fn(x: GLfloat, y: GLfloat)}
+    map_func_legacy! {get_integerv, glGetIntegerv: fn(pname: GLenum, data: *mut GLint)}
+    map_func_legacy! {get_string, glGetString: fn(name: GLenum) -> *const GLubyte}
+    map_func_legacy! {draw_elements, glDrawElements: fn(mode: GLenum, count: GLsizei, _type: GLenum, indices: *const GLvoid)}
+    map_func_legacy! {draw_arrays, glDrawArrays: fn(mode: GLenum, first: GLint, count: GLsizei)}
+    map_func_legacy! {get_error, glGetError: fn() -> GLenum}
+    map_func_legacy! {tex_parameter_i, glTexParameteri: fn(target: GLenum, pname: GLenum, param: GLint)}
+    map_func_legacy! {gen_textures, glGenTextures: fn(n: GLsizei, textures: *mut GLuint)}
+    map_func_legacy! {bind_texture, glBindTexture: fn(target: GLenum, texture: GLuint)}
+    map_func_legacy! {tex_image_2d, glTexImage2D: fn(target: GLenum, level: GLint, internalformat: GLint, width: GLsizei, height: GLsizei, border: GLint, format: GLenum, _type: GLenum, data: *const c_void)}
+    map_func_legacy! {delete_textures, glDeleteTextures: fn(n: GLsizei, textures: *const GLuint)}
+    map_func_legacy! {blend_func, glBlendFunc: fn(sfactor: GLenum, dfactor: GLenum)}
+    map_func_legacy! {enable, glEnable: fn(cap: GLenum)}
+    map_func_legacy! {viewport, glViewport: fn(x: GLint, y: GLint, width: GLsizei, height: GLsizei)}
 
     /*
-        Modern functions    
+        Modern functions
     */
-    map_func_modern!{create_shader, glCreateShader: fn(shaderType: GLenum) -> GLuint}
-    map_func_modern!{gen_buffers, glGenBuffers: fn(n: GLsizei, buffers: *mut GLuint)}
-    map_func_modern!{get_uniform_location, glGetUniformLocation: fn(program: GLuint, name: *const GLchar) -> GLint}
-    map_func_modern!{uniform_4f, glUniform4f: fn(location: GLint, v0: GLfloat, v1: GLfloat, v2: GLfloat, v3: GLfloat)}
-    map_func_modern!{delete_program, glDeleteProgram: fn(program: GLuint)}
-    map_func_modern!{get_shader_infolog, glGetShaderInfoLog: fn(shader: GLuint, maxLength: GLsizei, length: *mut GLsizei, infoLog: *mut GLchar)}
-    map_func_modern!{get_shaderiv, glGetShaderiv: fn(shader: GLuint, pname: GLenum, params: *mut GLint)}
-    map_func_modern!{delete_shader, glDeleteShader: fn(shader: GLuint)}
-    map_func_modern!{use_program, glUseProgram: fn(program: GLuint)}
-    map_func_modern!{validate_program, glValidateProgram: fn(program: GLuint)}
-    map_func_modern!{link_program, glLinkProgram: fn(program: GLuint)}
-    map_func_modern!{attach_shader, glAttachShader: fn(program: GLuint, shader: GLuint)}
-    map_func_modern!{compile_shader, glCompileShader: fn(shader: GLuint)}
-    map_func_modern!{shader_source, glShaderSource: fn(shader: GLuint, count: GLsizei, string: *const *const GLchar, length: *const GLint)}
-    map_func_modern!{create_program, glCreateProgram: fn() -> GLuint}
-    map_func_modern!{vertex_attrib_pointer, glVertexAttribPointer: fn(index: GLuint, size: GLint, _type: GLenum, normalized: GLboolean, stride: GLsizei, function_pointer: *const GLvoid)}
-    map_func_modern!{enable_vertex_attrib_array, glEnableVertexAttribArray: fn(index: GLuint)}
-    map_func_modern!{buffer_data, glBufferData: fn(target: GLenum, size: GLsizeiptr, data: *const c_void, usage: GLenum)}
-    map_func_modern!{bind_buffer, glBindBuffer: fn(target: GLenum, buffer: GLuint)}
-    map_func_modern!{get_stringi, glGetStringi:fn(name: GLenum, index: GLuint) -> *const GLubyte}
-    map_func_modern!{gen_vertex_arrays, glGenVertexArrays: fn(n: GLsizei, arrays: *mut GLuint)}
-    map_func_modern!{bind_vertex_array, glBindVertexArray: fn(array: GLuint)}
-    map_func_modern!{delete_buffers, glDeleteBuffers: fn(n: GLsizei, buffers: *const GLuint)}  
-    map_func_modern!{delete_vertex_arrays, glDeleteVertexArrays: fn(n: GLsizei, arrays: *const GLuint)}
-    //map_func_modern!{gen_textures, glGenTextures: fn(n: GLsizei, textures: *const GLuint)}  
-    //map_func_modern!{bind_texture, glBindTexture: fn(target: GLenum, texture: GLuint)}  
-    //map_func_modern!{tex_parameter_i, glTexParameteri: fn(target: GLenum, pname: GLenum, param: GLint)}  
-    //map_func_modern!{tex_image_2d, glTexImage2D: fn(target: GLenum, level: GLint, internalformat: GLint, width: GLsizei, height: GLsizei, border: GLint, format: GLenum, _type: GLenum, data: *const c_void)}  
-    //map_func_modern!{delete_textures, glDeleteTextures: fn(n: GLsizei, textures: *const GLuint)}  
-    map_func_modern!{active_texture, glActiveTexture: fn(textures: GLenum)}  
-    map_func_modern!{uniform_1i, glUniform1i: fn(location: GLint, v0: GLint)}  
-    //map_func_modern!{blend_func, glBlendFunc: fn(sfactor: GLenum, dfactor: GLenum)}  
-    map_func_modern!{uniform_matrix_4fv, glUniformMatrix4fv: fn(location: GLint, count: GLsizei, transpose: GLboolean, value: *const GLfloat)}  
-    map_func_modern!{enable_vertex_array_attrib, glEnableVertexArrayAttrib: fn(vaobj: GLuint, index: GLuint)}  
-    map_func_modern!{bind_texture_unit, glBindTextureUnit: fn(unit: GLuint, texture: GLuint)}  
-    map_func_modern!{uniform_1iv, glUniform1iv: fn(location: GLint, count: GLsizei, value: *const GLint)}  
-    map_func_modern!{map_buffer, glMapBuffer: fn(target: GLenum, access: GLenum)}  
-    map_func_modern!{unmap_buffer, glUnmapBuffer: fn(target: GLenum) -> GLboolean}  
-    map_func_modern!{buffer_sub_data, glBufferSubData: fn(target: GLenum, offset: GLintptr, size: GLsizeiptr, data: *const c_void)}  
-    //map_func_modern!{viewport, glViewport: fn(x: GLint, y: GLint, width: GLsizei, height: GLsizei)}  
+    map_func_modern! {create_shader, glCreateShader: fn(shaderType: GLenum) -> GLuint}
+    map_func_modern! {gen_buffers, glGenBuffers: fn(n: GLsizei, buffers: *mut GLuint)}
+    map_func_modern! {get_uniform_location, glGetUniformLocation: fn(program: GLuint, name: *const GLchar) -> GLint}
+    map_func_modern! {uniform_4f, glUniform4f: fn(location: GLint, v0: GLfloat, v1: GLfloat, v2: GLfloat, v3: GLfloat)}
+    map_func_modern! {delete_program, glDeleteProgram: fn(program: GLuint)}
+    map_func_modern! {get_shader_infolog, glGetShaderInfoLog: fn(shader: GLuint, maxLength: GLsizei, length: *mut GLsizei, infoLog: *mut GLchar)}
+    map_func_modern! {get_shaderiv, glGetShaderiv: fn(shader: GLuint, pname: GLenum, params: *mut GLint)}
+    map_func_modern! {delete_shader, glDeleteShader: fn(shader: GLuint)}
+    map_func_modern! {use_program, glUseProgram: fn(program: GLuint)}
+    map_func_modern! {validate_program, glValidateProgram: fn(program: GLuint)}
+    map_func_modern! {link_program, glLinkProgram: fn(program: GLuint)}
+    map_func_modern! {attach_shader, glAttachShader: fn(program: GLuint, shader: GLuint)}
+    map_func_modern! {compile_shader, glCompileShader: fn(shader: GLuint)}
+    map_func_modern! {shader_source, glShaderSource: fn(shader: GLuint, count: GLsizei, string: *const *const GLchar, length: *const GLint)}
+    map_func_modern! {create_program, glCreateProgram: fn() -> GLuint}
+    map_func_modern! {vertex_attrib_pointer, glVertexAttribPointer: fn(index: GLuint, size: GLint, _type: GLenum, normalized: GLboolean, stride: GLsizei, function_pointer: *const GLvoid)}
+    map_func_modern! {enable_vertex_attrib_array, glEnableVertexAttribArray: fn(index: GLuint)}
+    map_func_modern! {buffer_data, glBufferData: fn(target: GLenum, size: GLsizeiptr, data: *const c_void, usage: GLenum)}
+    map_func_modern! {bind_buffer, glBindBuffer: fn(target: GLenum, buffer: GLuint)}
+    map_func_modern! {get_stringi, glGetStringi:fn(name: GLenum, index: GLuint) -> *const GLubyte}
+    map_func_modern! {gen_vertex_arrays, glGenVertexArrays: fn(n: GLsizei, arrays: *mut GLuint)}
+    map_func_modern! {bind_vertex_array, glBindVertexArray: fn(array: GLuint)}
+    map_func_modern! {delete_buffers, glDeleteBuffers: fn(n: GLsizei, buffers: *const GLuint)}
+    map_func_modern! {delete_vertex_arrays, glDeleteVertexArrays: fn(n: GLsizei, arrays: *const GLuint)}
+    //map_func_modern!{gen_textures, glGenTextures: fn(n: GLsizei, textures: *const GLuint)}
+    //map_func_modern!{bind_texture, glBindTexture: fn(target: GLenum, texture: GLuint)}
+    //map_func_modern!{tex_parameter_i, glTexParameteri: fn(target: GLenum, pname: GLenum, param: GLint)}
+    //map_func_modern!{tex_image_2d, glTexImage2D: fn(target: GLenum, level: GLint, internalformat: GLint, width: GLsizei, height: GLsizei, border: GLint, format: GLenum, _type: GLenum, data: *const c_void)}
+    //map_func_modern!{delete_textures, glDeleteTextures: fn(n: GLsizei, textures: *const GLuint)}
+    map_func_modern! {active_texture, glActiveTexture: fn(textures: GLenum)}
+    map_func_modern! {uniform_1i, glUniform1i: fn(location: GLint, v0: GLint)}
+    //map_func_modern!{blend_func, glBlendFunc: fn(sfactor: GLenum, dfactor: GLenum)}
+    map_func_modern! {uniform_matrix_4fv, glUniformMatrix4fv: fn(location: GLint, count: GLsizei, transpose: GLboolean, value: *const GLfloat)}
+    map_func_modern! {enable_vertex_array_attrib, glEnableVertexArrayAttrib: fn(vaobj: GLuint, index: GLuint)}
+    map_func_modern! {bind_texture_unit, glBindTextureUnit: fn(unit: GLuint, texture: GLuint)}
+    map_func_modern! {uniform_1iv, glUniform1iv: fn(location: GLint, count: GLsizei, value: *const GLint)}
+    map_func_modern! {map_buffer, glMapBuffer: fn(target: GLenum, access: GLenum)}
+    map_func_modern! {unmap_buffer, glUnmapBuffer: fn(target: GLenum) -> GLboolean}
+    map_func_modern! {buffer_sub_data, glBufferSubData: fn(target: GLenum, offset: GLintptr, size: GLsizeiptr, data: *const c_void)}
+    //map_func_modern!{viewport, glViewport: fn(x: GLint, y: GLint, width: GLsizei, height: GLsizei)}
 }
 
 #[cfg(test)]
@@ -387,7 +395,7 @@ mod tests {
 
     #[test]
     fn modern_opengl_bindings() {
-        unsafe{
+        unsafe {
             let window: *mut GLFWwindow;
             let monitor: *mut GLFWmonitor = null_mut();
             let share: *mut GLFWwindow = null_mut();
@@ -405,7 +413,7 @@ mod tests {
 
             glfwMakeContextCurrent(window);
             let gl = GL::bind();
-            
+
             // this function can be used as a sanity check as it's legacy opengl
             // assert!(gl.glBlendFunc.is_none());
 
@@ -442,6 +450,6 @@ mod tests {
             assert!(gl.glMapBuffer.is_some());
             assert!(gl.glUnmapBuffer.is_some());
             assert!(gl.glBufferSubData.is_some());
-        }   
+        }
     }
 }
