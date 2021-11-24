@@ -416,7 +416,10 @@ pub unsafe fn toggle_field(pointer: *const c_void, value: (usize, usize)) {
             move_string.push(char::from_digit(inner.0 as u32 + 1, 10).unwrap());
             move_string.push(char::from_digit(value.1 as u32 + 1, 10).unwrap());
             move_string.push(char::from_digit(value.0 as u32 + 1, 10).unwrap());
-            State::perform_turn_from_input(move_string, &mut game_state.game);
+            let current_state = game_state.game.back().unwrap();
+            let new_state = State::perform_turn_from_input(move_string, current_state);
+            drop(current_state);
+            game_state.game.push_back(new_state);
             None
         }
         _ => Some(value),

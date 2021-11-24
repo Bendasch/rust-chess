@@ -1,5 +1,5 @@
 pub use std::cell::Ref;
-use std::{cell::RefCell, cmp::max, cmp::PartialEq, collections::LinkedList};
+use std::{cell::RefCell, cmp::max, cmp::PartialEq};
 
 pub enum GameOver {
     No,
@@ -558,7 +558,7 @@ impl<'a> State {
         }
     }
 
-    pub fn perform_turn_from_input(player_input: String, game: &mut LinkedList<State>) {
+    pub fn perform_turn_from_input(player_input: String, current_state: &State) -> State {
         // transform to vector of characters and strip newlines or carriage returns
         let move_indices: Vec<usize> = player_input
             .chars()
@@ -576,31 +576,22 @@ impl<'a> State {
         // create a move instance
         let start_field = Field(move_indices[0] - 1, move_indices[1] - 1);
         let target_field = Field(move_indices[2] - 1, move_indices[3] - 1);
-        let chess_move = Move::new(
-            &start_field,
-            &target_field,
-            game.back_mut().unwrap().position_matrix().borrow(),
-        );
+        let chess_move = Move::new(&start_field, &target_field, current_state.position_matrix().borrow());
 
         // check whether the move is legal
         // TO DO: errors should properly propagated to the UI rather than panicking!
-        if !game.back().unwrap().is_move_legal(&chess_move) {
+        if !current_state.is_move_legal(&chess_move) {
             panic!(
                 "Illegal move. {:?} cant move {} from {:?} to {:?}",
-                game.back_mut().unwrap().turn(),
+                current_state.turn(),
                 chess_move.piece_string(),
                 chess_move.start_field(),
                 chess_move.target_field()
             );
         }
 
-        // create a new game state by executing the move and push it to the game list
-        let new_state: State = game.back_mut().unwrap().execute_move(&chess_move);
-        new_state
-            .position()
-            .borrow_mut()
-            .update_from_matrix(new_state.position_matrix().borrow());
-        game.push_back(new_state);
+        // execute the new move and return the new state
+        current_state.execute_move(&chess_move)
     }
 
     fn is_move_legal(&self, chess_move: &Move) -> bool {
@@ -933,6 +924,10 @@ impl<'a> State {
         }
 
         new_state.toggle_turn();
+        new_state
+            .position()
+            .borrow_mut()
+            .update_from_matrix(new_state.position_matrix().borrow());
 
         new_state
     }

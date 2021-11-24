@@ -34,11 +34,13 @@ pub fn run(fen: Option<String>) {
     game.push_back(State::new(fen));
 
     loop {
+        let current_state = game.back().unwrap();
+
         // start by showing the current board state
-        draw_board(game.back().unwrap().position().borrow());
+        draw_board(current_state.position().borrow());
 
         // who to move?
-        match game.back().unwrap().check_game_over() {
+        match current_state.check_game_over() {
             GameOver::BlackWon => {
                 println!("Checkmate, black won!");
                 return;
@@ -52,7 +54,7 @@ pub fn run(fen: Option<String>) {
                 return;
             }
 
-            _ => draw_who_to_move(game.back().unwrap().turn()),
+            _ => draw_who_to_move(current_state.turn()),
         }
 
         // get input from player
@@ -61,7 +63,9 @@ pub fn run(fen: Option<String>) {
 
         // execute the move according to the players input.
         // the resulting state is appended to the game list.
-        State::perform_turn_from_input(move_string, &mut game);
+        let new_state = State::perform_turn_from_input(move_string, current_state);
+        drop(current_state);
+        game.push_back(new_state);
     }
 }
 
