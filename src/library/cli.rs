@@ -28,7 +28,10 @@ const BLACK_PAWN: char = '\u{2659}';
     For example, the starting move "e4" would be entered as "2545". In the future parsing of moves in more intuitive
     notation may be supported.
 */
+#[rustfmt::skip]
 pub fn run(fen: Option<String>) {
+    use MoveError::*;
+
     // start from a provided or an initial position
     let mut game: LinkedList<State> = LinkedList::new();
     game.push_back(State::new(fen));
@@ -64,8 +67,27 @@ pub fn run(fen: Option<String>) {
         // execute the move according to the players input.
         // the resulting state is appended to the game list.
         let new_state = State::perform_turn_from_input(move_string, current_state);
-        drop(current_state);
-        game.push_back(new_state);
+
+        match new_state {
+            Ok(new_state) => {
+                drop(current_state);
+                game.push_back(new_state)
+            }
+            Err(OutOfBounds)           => println!("Please stay within the bounds 1-8!"),
+            Err(NoneDigitEntered)      => println!("Please only enter digits!"),
+            Err(InvalidNumberOfDigits) => println!("Please enter four digits!"),
+            Err(NoPieceSelected)       => println!("No piece selected!"),
+            Err(WrongColorSelected)    => println!("Enemy piece selected!"),
+            Err(PieceCantReachTarget)  => println!("The selected piece can't reach this field!"),
+            Err(OwnPieceOnTarget)      => println!("One of your pieces already is on this field!"),
+            Err(NoPathToTarget)        => println!("The selected piece has no path to this field!"),
+            Err(PieceIsPinned)         => println!("The selected piece is pinned!"),
+            Err(MovingIntoCheck)       => println!("You would be moving into check!"),
+            Err(NotMovingOutOfCheck)   => println!("You need to move out of check!"),
+            Err(CastlingThroughCheck)  => println!("You would be castling through check!"),
+            Err(CastlingNotAvailable)  => println!("You can't castle anymore!"),
+            Err(None)                  => println!("Invalid move!"),
+        }
     }
 }
 

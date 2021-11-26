@@ -419,7 +419,7 @@ pub unsafe fn toggle_field(pointer: *const c_void, value: (usize, usize)) {
             let current_state = game_state.game.back().unwrap();
             let new_state = State::perform_turn_from_input(move_string, current_state);
             drop(current_state);
-            game_state.game.push_back(new_state);
+            game_state.game.push_back(new_state.unwrap());
             None
         }
         _ => Some(value),

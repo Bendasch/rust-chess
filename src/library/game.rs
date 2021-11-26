@@ -8,6 +8,24 @@ pub enum GameOver {
     Stalemate,
 }
 
+#[derive(Debug, PartialEq)]
+pub enum MoveError {
+    None,
+    NoneDigitEntered,
+    InvalidNumberOfDigits,
+    OutOfBounds,
+    NoPieceSelected,
+    WrongColorSelected,
+    PieceCantReachTarget,
+    OwnPieceOnTarget,
+    NoPathToTarget,
+    PieceIsPinned,
+    MovingIntoCheck,
+    NotMovingOutOfCheck,
+    CastlingThroughCheck,
+    CastlingNotAvailable,
+}
+
 #[derive(PartialEq, Copy, Clone, Debug)]
 pub enum Color {
     Black,
@@ -133,6 +151,43 @@ impl Move {
             start_field: start_field.clone(),
             target_field: target_field.clone(),
         }
+    }
+
+    #[rustfmt::skip]
+    pub fn parse_player_input(player_input: String) -> Result<(Field, Field), MoveError> {
+        let move_chars: Vec<char> = player_input
+            .chars()
+            .filter(|c| *c != '\n' && *c != '\r')
+            .collect();
+
+        if move_chars.len() != 4 {
+            return Err(MoveError::InvalidNumberOfDigits);
+        }
+        
+        for char in move_chars.iter() {
+            if !char.is_ascii_digit() {
+                return Err(MoveError::NoneDigitEntered);
+            }
+        }
+
+        let move_indices: Vec<usize> = move_chars.iter().map(|c| c.to_digit(10).expect("Faulty move string") as usize).collect();
+
+        if move_indices[0] < 1 || 
+           move_indices[0] > 8 || 
+           move_indices[1] < 1 || 
+           move_indices[1] > 8 || 
+           move_indices[2] < 1 || 
+           move_indices[2] > 8 || 
+           move_indices[3] < 1 || 
+           move_indices[3] > 8
+        {
+            return Err(MoveError::OutOfBounds);
+        }
+        
+        let start_field = Field(move_indices[0] - 1, move_indices[1] - 1);
+        let target_field = Field(move_indices[2] - 1, move_indices[3] - 1);
+
+        Ok((start_field, target_field))
     }
 }
 
@@ -530,8 +585,9 @@ impl<'a> State {
                         let chess_move =
                             Move::new(&Field(i, j), &Field(k, l), self.position_matrix().borrow());
 
-                        if self.is_move_legal(&chess_move) {
-                            return true;
+                        match self.is_move_legal(&chess_move) {
+                            Ok(_) => return true,
+                            Err(_) => continue,
                         }
                     }
                 }
@@ -558,59 +614,51 @@ impl<'a> State {
         }
     }
 
-    pub fn perform_turn_from_input(player_input: String, current_state: &State) -> State {
-        // transform to vector of characters and strip newlines or carriage returns
-        let move_indices: Vec<usize> = player_input
-            .chars()
-            .filter(|c| *c != '\n' && *c != '\r')
-            .map(|c| c.to_digit(10).expect("Faulty move string") as usize)
-            .collect();
+    pub fn perform_turn_from_input(
+        player_input: String,
+        current_state: &State,
+    ) -> Result<State, MoveError> {
 
-        // assert that the moves are within the bounds of the field
-        // TO DO: errors should properly propagated to the UI rather than panicking!
-        assert!(1 <= move_indices[0] && move_indices[0] <= 8);
-        assert!(1 <= move_indices[1] && move_indices[1] <= 8);
-        assert!(1 <= move_indices[2] && move_indices[2] <= 8);
-        assert!(1 <= move_indices[3] && move_indices[3] <= 8);
+        // get fields from player input
+        let (start_field, target_field) = match Move::parse_player_input(player_input) {
+            Ok((start_field, target_field)) => (start_field, target_field),
+            Err(e) => return Err(e),
+        };
 
-        // create a move instance
-        let start_field = Field(move_indices[0] - 1, move_indices[1] - 1);
-        let target_field = Field(move_indices[2] - 1, move_indices[3] - 1);
-        let chess_move = Move::new(&start_field, &target_field, current_state.position_matrix().borrow());
+        // make move struct which also includes the piece that is to be moved
+        let chess_move = Move::new(
+            &start_field,
+            &target_field,
+            current_state.position_matrix().borrow(),
+        );
 
         // check whether the move is legal
         // TO DO: errors should properly propagated to the UI rather than panicking!
-        if !current_state.is_move_legal(&chess_move) {
-            panic!(
-                "Illegal move. {:?} cant move {} from {:?} to {:?}",
-                current_state.turn(),
-                chess_move.piece_string(),
-                chess_move.start_field(),
-                chess_move.target_field()
-            );
+        match current_state.is_move_legal(&chess_move) {            
+            Ok(_) => Ok(current_state.execute_move(&chess_move)),
+            Err(e) => Err(e),
         }
-
-        // execute the new move and return the new state
-        current_state.execute_move(&chess_move)
     }
 
-    fn is_move_legal(&self, chess_move: &Move) -> bool {
+    fn is_move_legal(&self, chess_move: &Move) -> Result<bool, MoveError> {
+
         // assert that a piece was selected
         if chess_move.piece().piecetype() == &PieceType::None
             || chess_move.piece().color() == &Color::None
         {
-            return false;
+            return Err(MoveError::NoPieceSelected);
         }
 
         // assert that the piece has the proper color
         if !self.is_players_turn(chess_move.piece().color()) {
-            return false;
+            return Err(MoveError::WrongColorSelected);
         }
 
         // assert that the piece is allowed to move from the start to the target field
         // this includes asserting that castling or en-passant are available
-        if !self.piece_can_reach_target_field(chess_move) {
-            return false;
+        match self.piece_can_reach_target_field(chess_move) {
+            Ok(_) => {},
+            Err(e) => return Err(e),
         }
 
         // assert that none of the player's own pieces are on the target field
@@ -620,115 +668,130 @@ impl<'a> State {
             .get_color_of_piece_on_field(chess_move.target_field())
             == self.turn()
         {
-            return false;
+            return Err(MoveError::OwnPieceOnTarget);
         }
-
+        
         // assert that the way to the target field is not blocked
         if !self.piece_has_path_to_target_field(chess_move) {
-            return false;
+            return Err(MoveError::NoPathToTarget);
         }
 
-        // assert that the player's king is not in check after the planned move
-        // this both prevents pieces moving from pins and moves during checks which don't stop those checks
         // make a 'hypothetical move' and check whether the player would be in check
         let hypothetical_state: State = self.execute_move(chess_move);
         if hypothetical_state.is_player_in_check(self.turn()) {
-            return false;
+            if chess_move.piece.piecetype() == &PieceType::King {
+                // 1) king would have moved into check
+                return Err(MoveError::MovingIntoCheck);
+            } else {
+                if self.is_player_in_check(self.turn()) {
+                    // 2) didn't move out of check
+                    return Err(MoveError::NotMovingOutOfCheck);
+                } else {
+                    // 3) piece moved out of a pin
+                    return Err(MoveError::PieceIsPinned);
+                }
+            } 
         }
 
         // in case of castling, assert that the kings does not move through check
         if self.is_castling_through_check(chess_move) {
-            return false;
+            return Err(MoveError::CastlingThroughCheck);
         }
 
         // the move is legal, if no condition made it illegal
-        true
+        Ok(true)
     }
 
     fn is_players_turn(&self, turn: &Color) -> bool {
         return self.turn() == turn;
     }
 
-    fn piece_can_reach_target_field(&self, chess_move: &Move) -> bool {
+    #[rustfmt::skip]
+    fn piece_can_reach_target_field(&self, chess_move: &Move) -> Result<bool, MoveError> {
         let rank_diff = chess_move.rank_difference();
         let file_diff = chess_move.file_difference();
         let rank_diff_abs = isize::abs(rank_diff);
         let file_diff_abs = isize::abs(file_diff);
+        let color = chess_move.piece().color();
+        let matrix = self.position_matrix().borrow();
 
         match chess_move.piece().piecetype() {
-            // regular moves
-            PieceType::Rook => (rank_diff == 0) ^ (file_diff == 0),
-            PieceType::Knight => {
-                (rank_diff_abs == 2 && file_diff_abs == 1)
-                    || (rank_diff_abs == 1 && file_diff_abs == 2)
+            PieceType::Rook => State::can_reach_target_result(
+                    (rank_diff == 0) ^ (file_diff == 0)),
+            PieceType::Knight => State::can_reach_target_result(
+                    (rank_diff_abs == 2 && file_diff_abs == 1)
+                ||  (rank_diff_abs == 1 && file_diff_abs == 2)),
+            PieceType::Bishop => State::can_reach_target_result(
+                    (rank_diff_abs == file_diff_abs) && (rank_diff != 0)),
+            PieceType::Queen => State::can_reach_target_result(
+                    ((rank_diff_abs == file_diff_abs) && (rank_diff != 0))
+                ||  ((rank_diff == 0) ^ (file_diff == 0))
+            ),
+            PieceType::King => {
+                if rank_diff_abs <= 1 && file_diff_abs <= 1 && (rank_diff_abs + file_diff_abs) >= 1 {
+                    Ok(true)
+                } else {
+                    let is_castling = match *color {
+                        Color::White => (
+                            chess_move.target_field().0 == 0 && chess_move.target_field().1 == 2, 
+                            chess_move.target_field().0 == 0 && chess_move.target_field().1 == 6), 
+                        Color::Black => (
+                            chess_move.target_field().0 == 7 && chess_move.target_field().1 == 2, 
+                            chess_move.target_field().0 == 7 && chess_move.target_field().1 == 6),
+                        _ => panic!("Invalid color"),
+                    };
+                    State::castle_availability_result(color, is_castling, self.castle_availability())
+                }
+            },
+            PieceType::Pawn => {
+                if  (file_diff == 0 && rank_diff ==  1 && color == &Color::White)
+                ||  (file_diff == 0 && rank_diff == -1 && color == &Color::Black)
+                ||  (file_diff == 0 && rank_diff ==  2 && color == &Color::White && chess_move.start_field().0 == 1) 
+                ||  (file_diff == 0 && rank_diff == -2 && color == &Color::Black && chess_move.start_field().0 == 6) {
+                    return Ok(true)
+                } 
+                if rank_diff_abs != 1 || file_diff_abs != 1 {
+                    return Err(MoveError::PieceCantReachTarget)
+                } 
+                let opposite_color = match *color {
+                    Color::White => Color::Black,
+                    Color::Black => Color::White,
+                    _ => panic!("Invalid color"),
+                };
+                match self.en_passant() {
+                    Some(field) if field == &chess_move.target_field => Ok(true),
+                    _ => State::can_reach_target_result(
+                        matrix.get_type_of_piece_on_field(chess_move.target_field()) != &PieceType::None
+                     && matrix.get_color_of_piece_on_field(chess_move.target_field()) == &opposite_color)
+                }
             }
-            PieceType::Bishop => (rank_diff_abs == file_diff_abs) && (rank_diff != 0),
-            PieceType::Queen => {
-                ((rank_diff_abs == file_diff_abs) && (rank_diff != 0))
-                    || ((rank_diff == 0) ^ (file_diff == 0))
-            }
-
-            // regular + special moves for king and pawn
-            PieceType::King if chess_move.piece().color() == &Color::White => {
-                (rank_diff_abs <= 1 && file_diff_abs <= 1 && (rank_diff_abs + file_diff_abs) >= 1)
-                    || (chess_move.target_field().0 == 0
-                        && chess_move.target_field().1 == 2
-                        && self.castle_availability().white_queen)
-                    || (chess_move.target_field().0 == 0
-                        && chess_move.target_field().1 == 6
-                        && self.castle_availability().white_king)
-            }
-            PieceType::King if chess_move.piece().color() == &Color::Black => {
-                (rank_diff_abs <= 1 && file_diff_abs <= 1 && (rank_diff_abs + file_diff_abs) >= 1)
-                    || (chess_move.target_field().0 == 7
-                        && chess_move.target_field().1 == 2
-                        && self.castle_availability().black_queen)
-                    || (chess_move.target_field().0 == 7
-                        && chess_move.target_field().1 == 6
-                        && self.castle_availability().black_king)
-            }
-            PieceType::Pawn if chess_move.piece().color() == &Color::White => {
-                (rank_diff == 1 && file_diff_abs == 0)
-                    || (rank_diff == 2 && chess_move.start_field().0 == 1 && file_diff == 0)
-                    || (rank_diff == 1
-                        && file_diff_abs == 1
-                        && ((self
-                            .position_matrix()
-                            .borrow()
-                            .get_type_of_piece_on_field(chess_move.target_field())
-                            != &PieceType::None
-                            && self
-                                .position_matrix()
-                                .borrow()
-                                .get_color_of_piece_on_field(chess_move.target_field())
-                                == &Color::Black)
-                            || (match self.en_passant() {
-                                Some(field) => field == &chess_move.target_field,
-                                None => false,
-                            })))
-            }
-            PieceType::Pawn if chess_move.piece().color() == &Color::Black => {
-                (rank_diff == -1 && file_diff_abs == 0)
-                    || (rank_diff == -2 && chess_move.start_field().0 == 6 && file_diff == 0)
-                    || (rank_diff == -1
-                        && file_diff_abs == 1
-                        && ((self
-                            .position_matrix()
-                            .borrow()
-                            .get_type_of_piece_on_field(chess_move.target_field())
-                            != &PieceType::None
-                            && self
-                                .position_matrix()
-                                .borrow()
-                                .get_color_of_piece_on_field(chess_move.target_field())
-                                == &Color::White)
-                            || (match self.en_passant() {
-                                Some(field) => field == &chess_move.target_field,
-                                None => false,
-                            })))
-            }
-
             _ => panic!("Move not properly processed. {:?}", chess_move),
+        }
+    }
+    
+    fn can_reach_target_result(can_reach: bool) -> Result<bool, MoveError> {
+        if can_reach {
+            Ok(true)
+        } else {
+            Err(MoveError::PieceCantReachTarget)
+        }
+    }
+    
+    fn castle_availability_result(color: &Color, is_castling: (bool, bool), castle_available: &CastleAvailability) -> Result<bool, MoveError> {
+        let availability = match *color {
+            Color::White => (castle_available.white_queen, castle_available.white_king),
+            Color::Black => (castle_available.black_queen, castle_available.black_king),
+            _ => panic!("Invalid color"), 
+        };
+
+        if is_castling.0 || is_castling.1 {
+            if is_castling.0 && availability.0 || is_castling.1 && availability.1 {
+                Ok(true)
+            } else {
+                Err(MoveError::CastlingNotAvailable)
+            } 
+        } else {
+            Err(MoveError::PieceCantReachTarget)
         }
     }
 
@@ -812,10 +875,9 @@ impl<'a> State {
                 }
 
                 let chess_move = Move::new(&Field(i, j), field, self.position_matrix().borrow());
-                if State::piece_can_reach_target_field(self, &chess_move)
-                    && State::piece_has_path_to_target_field(self, &chess_move)
-                {
-                    return true;
+                match State::piece_can_reach_target_field(self, &chess_move) {
+                    Ok(_) if State::piece_has_path_to_target_field(self, &chess_move) => return true,
+                    _ => continue,
                 }
             }
         }
@@ -1416,7 +1478,7 @@ mod tests {
             &target_field,
             state.position_matrix().borrow(),
         );
-        assert!(state.is_move_legal(&legal_move));
+        assert!(state.is_move_legal(&legal_move).unwrap());
 
         // illegal move
         let start_field = Field(7, 1);
@@ -1426,7 +1488,10 @@ mod tests {
             &target_field,
             state.position_matrix().borrow(),
         );
-        assert!(!state.is_move_legal(&illegal_move));
+        assert!(match state.is_move_legal(&illegal_move) {
+            Ok(_) => false,
+            Err(_) => true,
+        });
     }
 
     #[test]
@@ -1448,7 +1513,7 @@ mod tests {
             &target_field,
             state.position_matrix().borrow(),
         );
-        assert!(state.piece_can_reach_target_field(&chess_move));
+        assert!(state.piece_can_reach_target_field(&chess_move).unwrap());
 
         // double up
         let start_field = Field(1, 4);
@@ -1458,7 +1523,7 @@ mod tests {
             &target_field,
             state.position_matrix().borrow(),
         );
-        assert!(state.piece_can_reach_target_field(&chess_move));
+        assert!(state.piece_can_reach_target_field(&chess_move).unwrap());
 
         // single down
         let start_field = Field(6, 4);
@@ -1468,7 +1533,7 @@ mod tests {
             &target_field,
             state.position_matrix().borrow(),
         );
-        assert!(state.piece_can_reach_target_field(&chess_move));
+        assert!(state.piece_can_reach_target_field(&chess_move).unwrap());
 
         // double down
         let start_field = Field(6, 4);
@@ -1478,7 +1543,7 @@ mod tests {
             &target_field,
             state.position_matrix().borrow(),
         );
-        assert!(state.piece_can_reach_target_field(&chess_move));
+        assert!(state.piece_can_reach_target_field(&chess_move).unwrap());
 
         // single diagonal down (should return false since no enemy piece is there)
         let start_field = Field(6, 4);
@@ -1488,7 +1553,7 @@ mod tests {
             &target_field,
             state.position_matrix().borrow(),
         );
-        assert!(!state.piece_can_reach_target_field(&chess_move));
+        assert!(state.piece_can_reach_target_field(&chess_move) == Err(MoveError::PieceCantReachTarget));
 
         // single diagonal up (should return false since no enemy piece is there)
         let start_field = Field(1, 4);
@@ -1498,7 +1563,7 @@ mod tests {
             &target_field,
             state.position_matrix().borrow(),
         );
-        assert!(!state.piece_can_reach_target_field(&chess_move));
+        assert!(state.piece_can_reach_target_field(&chess_move) == Err(MoveError::PieceCantReachTarget));
 
         // three up (should return false!)
         let start_field = Field(1, 5);
@@ -1508,7 +1573,7 @@ mod tests {
             &target_field,
             state.position_matrix().borrow(),
         );
-        assert!(!state.piece_can_reach_target_field(&chess_move));
+        assert!(state.piece_can_reach_target_field(&chess_move) == Err(MoveError::PieceCantReachTarget));
 
         // two up one to the side (should return false!)
         let start_field = Field(1, 0);
@@ -1518,7 +1583,7 @@ mod tests {
             &target_field,
             state.position_matrix().borrow(),
         );
-        assert!(!state.piece_can_reach_target_field(&chess_move));
+        assert!(state.piece_can_reach_target_field(&chess_move) == Err(MoveError::PieceCantReachTarget));
 
         // one down two to the side (should return false!)
         let start_field = Field(6, 6);
@@ -1528,7 +1593,7 @@ mod tests {
             &target_field,
             state.position_matrix().borrow(),
         );
-        assert!(!state.piece_can_reach_target_field(&chess_move));
+        assert!(state.piece_can_reach_target_field(&chess_move) == Err(MoveError::PieceCantReachTarget));
     }
 
     #[test]
@@ -1543,7 +1608,7 @@ mod tests {
             &target_field,
             state.position_matrix().borrow(),
         );
-        assert!(state.piece_can_reach_target_field(&chess_move));
+        assert!(state.piece_can_reach_target_field(&chess_move).unwrap());
 
         // single right
         let start_field = Field(0, 4);
@@ -1553,7 +1618,7 @@ mod tests {
             &target_field,
             state.position_matrix().borrow(),
         );
-        assert!(state.piece_can_reach_target_field(&chess_move));
+        assert!(state.piece_can_reach_target_field(&chess_move).unwrap());
 
         // double up
         let start_field = Field(0, 4);
@@ -1563,7 +1628,7 @@ mod tests {
             &target_field,
             state.position_matrix().borrow(),
         );
-        assert!(!state.piece_can_reach_target_field(&chess_move));
+        assert!(state.piece_can_reach_target_field(&chess_move) == Err(MoveError::PieceCantReachTarget));
 
         // double diagonal
         let start_field = Field(0, 4);
@@ -1573,7 +1638,7 @@ mod tests {
             &target_field,
             state.position_matrix().borrow(),
         );
-        assert!(!state.piece_can_reach_target_field(&chess_move));
+        assert!(state.piece_can_reach_target_field(&chess_move) == Err(MoveError::PieceCantReachTarget));
 
         // castle queen-side
         let start_field = Field(0, 4);
@@ -1583,7 +1648,7 @@ mod tests {
             &target_field,
             state.position_matrix().borrow(),
         );
-        assert!(state.piece_can_reach_target_field(&chess_move));
+        assert!(state.piece_can_reach_target_field(&chess_move).unwrap());
 
         // castle king-side
         let start_field = Field(0, 4);
@@ -1593,7 +1658,7 @@ mod tests {
             &target_field,
             state.position_matrix().borrow(),
         );
-        assert!(state.piece_can_reach_target_field(&chess_move));
+        assert!(state.piece_can_reach_target_field(&chess_move).unwrap());
 
         // TODO: assert castling is NOT allowed e.g. when king moved
     }
@@ -1610,7 +1675,7 @@ mod tests {
             &target_field,
             state.position_matrix().borrow(),
         );
-        assert!(state.piece_can_reach_target_field(&chess_move));
+        assert!(state.piece_can_reach_target_field(&chess_move).unwrap());
 
         // two up one left
         let start_field = Field(0, 1);
@@ -1620,7 +1685,7 @@ mod tests {
             &target_field,
             state.position_matrix().borrow(),
         );
-        assert!(state.piece_can_reach_target_field(&chess_move));
+        assert!(state.piece_can_reach_target_field(&chess_move).unwrap());
 
         // two right one down
         let start_field = Field(7, 1);
@@ -1630,7 +1695,7 @@ mod tests {
             &target_field,
             state.position_matrix().borrow(),
         );
-        assert!(state.piece_can_reach_target_field(&chess_move));
+        assert!(state.piece_can_reach_target_field(&chess_move).unwrap());
 
         // two right one up
         let start_field = Field(0, 1);
@@ -1640,9 +1705,9 @@ mod tests {
             &target_field,
             state.position_matrix().borrow(),
         );
-        assert!(state.piece_can_reach_target_field(&chess_move));
+        assert!(state.piece_can_reach_target_field(&chess_move).unwrap());
 
-        // single diagonal up (should return false)
+        // single diagonal up
         let start_field = Field(0, 1);
         let target_field = Field(1, 0);
         let chess_move = Move::new(
@@ -1650,9 +1715,9 @@ mod tests {
             &target_field,
             state.position_matrix().borrow(),
         );
-        assert!(!state.piece_can_reach_target_field(&chess_move));
+        assert!(state.piece_can_reach_target_field(&chess_move) == Err(MoveError::PieceCantReachTarget));
 
-        // single diagonal down (should return false)
+        // single diagonal down
         let start_field = Field(7, 6);
         let target_field = Field(6, 5);
         let chess_move = Move::new(
@@ -1660,9 +1725,9 @@ mod tests {
             &target_field,
             state.position_matrix().borrow(),
         );
-        assert!(!state.piece_can_reach_target_field(&chess_move));
+        assert!(state.piece_can_reach_target_field(&chess_move) == Err(MoveError::PieceCantReachTarget));
 
-        // double up (should return false)
+        // double up
         let start_field = Field(0, 1);
         let target_field = Field(2, 1);
         let chess_move = Move::new(
@@ -1670,9 +1735,9 @@ mod tests {
             &target_field,
             state.position_matrix().borrow(),
         );
-        assert!(!state.piece_can_reach_target_field(&chess_move));
+        assert!(state.piece_can_reach_target_field(&chess_move) == Err(MoveError::PieceCantReachTarget));
 
-        // double to side (should return false)
+        // double to side
         let start_field = Field(0, 6);
         let target_field = Field(0, 4);
         let chess_move = Move::new(
@@ -1680,9 +1745,9 @@ mod tests {
             &target_field,
             state.position_matrix().borrow(),
         );
-        assert!(!state.piece_can_reach_target_field(&chess_move));
+        assert!(state.piece_can_reach_target_field(&chess_move) == Err(MoveError::PieceCantReachTarget));
 
-        // single up (should return false)
+        // single up
         let start_field = Field(0, 6);
         let target_field = Field(1, 6);
         let chess_move = Move::new(
@@ -1690,7 +1755,7 @@ mod tests {
             &target_field,
             state.position_matrix().borrow(),
         );
-        assert!(!state.piece_can_reach_target_field(&chess_move));
+        assert!(state.piece_can_reach_target_field(&chess_move) == Err(MoveError::PieceCantReachTarget));
     }
 
     #[test]
@@ -1705,7 +1770,7 @@ mod tests {
             &target_field,
             state.position_matrix().borrow(),
         );
-        assert!(state.piece_can_reach_target_field(&chess_move));
+        assert!(state.piece_can_reach_target_field(&chess_move).unwrap());
 
         // one diagonal down
         let start_field = Field(7, 2);
@@ -1715,7 +1780,7 @@ mod tests {
             &target_field,
             state.position_matrix().borrow(),
         );
-        assert!(state.piece_can_reach_target_field(&chess_move));
+        assert!(state.piece_can_reach_target_field(&chess_move).unwrap());
 
         // three diagonal up
         let start_field = Field(0, 2);
@@ -1725,7 +1790,7 @@ mod tests {
             &target_field,
             state.position_matrix().borrow(),
         );
-        assert!(state.piece_can_reach_target_field(&chess_move));
+        assert!(state.piece_can_reach_target_field(&chess_move).unwrap());
 
         // five diagonal down
         let start_field = Field(7, 5);
@@ -1735,9 +1800,9 @@ mod tests {
             &target_field,
             state.position_matrix().borrow(),
         );
-        assert!(state.piece_can_reach_target_field(&chess_move));
+        assert!(state.piece_can_reach_target_field(&chess_move).unwrap());
 
-        // one to the side (should return false)
+        // one to the side
         let start_field = Field(0, 2);
         let target_field = Field(0, 3);
         let chess_move = Move::new(
@@ -1745,9 +1810,9 @@ mod tests {
             &target_field,
             state.position_matrix().borrow(),
         );
-        assert!(!state.piece_can_reach_target_field(&chess_move));
+        assert!(state.piece_can_reach_target_field(&chess_move) == Err(MoveError::PieceCantReachTarget));
 
-        // one up (should return false)
+        // one up
         let start_field = Field(0, 2);
         let target_field = Field(1, 2);
         let chess_move = Move::new(
@@ -1755,9 +1820,9 @@ mod tests {
             &target_field,
             state.position_matrix().borrow(),
         );
-        assert!(!state.piece_can_reach_target_field(&chess_move));
+        assert!(state.piece_can_reach_target_field(&chess_move) == Err(MoveError::PieceCantReachTarget));
 
-        // one down (should return false)
+        // one down
         let start_field = Field(7, 2);
         let target_field = Field(6, 2);
         let chess_move = Move::new(
@@ -1765,9 +1830,9 @@ mod tests {
             &target_field,
             state.position_matrix().borrow(),
         );
-        assert!(!state.piece_can_reach_target_field(&chess_move));
+        assert!(state.piece_can_reach_target_field(&chess_move) == Err(MoveError::PieceCantReachTarget));
 
-        // two down, one to the side (should return false)
+        // two down, one to the side
         let start_field = Field(7, 2);
         let target_field = Field(5, 2);
         let chess_move = Move::new(
@@ -1775,7 +1840,7 @@ mod tests {
             &target_field,
             state.position_matrix().borrow(),
         );
-        assert!(!state.piece_can_reach_target_field(&chess_move));
+        assert!(state.piece_can_reach_target_field(&chess_move) == Err(MoveError::PieceCantReachTarget));
     }
 
     #[test]
@@ -1790,7 +1855,7 @@ mod tests {
             &target_field,
             state.position_matrix().borrow(),
         );
-        assert!(state.piece_can_reach_target_field(&chess_move));
+        assert!(state.piece_can_reach_target_field(&chess_move).unwrap());
 
         // four up
         let start_field = Field(0, 0);
@@ -1800,7 +1865,7 @@ mod tests {
             &target_field,
             state.position_matrix().borrow(),
         );
-        assert!(state.piece_can_reach_target_field(&chess_move));
+        assert!(state.piece_can_reach_target_field(&chess_move).unwrap());
 
         // seven down
         let start_field = Field(7, 0);
@@ -1810,7 +1875,7 @@ mod tests {
             &target_field,
             state.position_matrix().borrow(),
         );
-        assert!(state.piece_can_reach_target_field(&chess_move));
+        assert!(state.piece_can_reach_target_field(&chess_move).unwrap());
 
         // one to the side
         let start_field = Field(7, 0);
@@ -1820,7 +1885,7 @@ mod tests {
             &target_field,
             state.position_matrix().borrow(),
         );
-        assert!(state.piece_can_reach_target_field(&chess_move));
+        assert!(state.piece_can_reach_target_field(&chess_move).unwrap());
 
         // five to the side
         let start_field = Field(7, 7);
@@ -1830,9 +1895,9 @@ mod tests {
             &target_field,
             state.position_matrix().borrow(),
         );
-        assert!(state.piece_can_reach_target_field(&chess_move));
+        assert!(state.piece_can_reach_target_field(&chess_move).unwrap());
 
-        // one diagonal (should return false)
+        // one diagonal
         let start_field = Field(0, 0);
         let target_field = Field(1, 1);
         let chess_move = Move::new(
@@ -1840,9 +1905,9 @@ mod tests {
             &target_field,
             state.position_matrix().borrow(),
         );
-        assert!(!state.piece_can_reach_target_field(&chess_move));
+        assert!(state.piece_can_reach_target_field(&chess_move) == Err(MoveError::PieceCantReachTarget));
 
-        // three diagonal (should return false)
+        // three diagonal
         let start_field = Field(7, 7);
         let target_field = Field(4, 4);
         let chess_move = Move::new(
@@ -1850,9 +1915,9 @@ mod tests {
             &target_field,
             state.position_matrix().borrow(),
         );
-        assert!(!state.piece_can_reach_target_field(&chess_move));
+        assert!(state.piece_can_reach_target_field(&chess_move) == Err(MoveError::PieceCantReachTarget));
 
-        // four to the side three down (should return false)
+        // four to the side three down
         let start_field = Field(7, 7);
         let target_field = Field(4, 3);
         let chess_move = Move::new(
@@ -1860,7 +1925,7 @@ mod tests {
             &target_field,
             state.position_matrix().borrow(),
         );
-        assert!(!state.piece_can_reach_target_field(&chess_move));
+        assert!(state.piece_can_reach_target_field(&chess_move) == Err(MoveError::PieceCantReachTarget));
     }
 
     #[test]
@@ -1875,7 +1940,7 @@ mod tests {
             &target_field,
             state.position_matrix().borrow(),
         );
-        assert!(state.piece_can_reach_target_field(&chess_move));
+        assert!(state.piece_can_reach_target_field(&chess_move).unwrap());
 
         // one diagonal down
         let start_field = Field(7, 3);
@@ -1885,7 +1950,7 @@ mod tests {
             &target_field,
             state.position_matrix().borrow(),
         );
-        assert!(state.piece_can_reach_target_field(&chess_move));
+        assert!(state.piece_can_reach_target_field(&chess_move).unwrap());
 
         // three diagonal up
         let start_field = Field(0, 3);
@@ -1895,7 +1960,7 @@ mod tests {
             &target_field,
             state.position_matrix().borrow(),
         );
-        assert!(state.piece_can_reach_target_field(&chess_move));
+        assert!(state.piece_can_reach_target_field(&chess_move).unwrap());
 
         // four diagonal down
         let start_field = Field(7, 3);
@@ -1905,7 +1970,7 @@ mod tests {
             &target_field,
             state.position_matrix().borrow(),
         );
-        assert!(state.piece_can_reach_target_field(&chess_move));
+        assert!(state.piece_can_reach_target_field(&chess_move).unwrap());
 
         // one up
         let start_field = Field(0, 3);
@@ -1915,7 +1980,7 @@ mod tests {
             &target_field,
             state.position_matrix().borrow(),
         );
-        assert!(state.piece_can_reach_target_field(&chess_move));
+        assert!(state.piece_can_reach_target_field(&chess_move).unwrap());
 
         // four up
         let start_field = Field(0, 3);
@@ -1925,7 +1990,7 @@ mod tests {
             &target_field,
             state.position_matrix().borrow(),
         );
-        assert!(state.piece_can_reach_target_field(&chess_move));
+        assert!(state.piece_can_reach_target_field(&chess_move).unwrap());
 
         // seven down
         let start_field = Field(7, 3);
@@ -1935,7 +2000,7 @@ mod tests {
             &target_field,
             state.position_matrix().borrow(),
         );
-        assert!(state.piece_can_reach_target_field(&chess_move));
+        assert!(state.piece_can_reach_target_field(&chess_move).unwrap());
 
         // one to the side
         let start_field = Field(7, 3);
@@ -1945,7 +2010,7 @@ mod tests {
             &target_field,
             state.position_matrix().borrow(),
         );
-        assert!(state.piece_can_reach_target_field(&chess_move));
+        assert!(state.piece_can_reach_target_field(&chess_move).unwrap());
 
         // three to the side
         let start_field = Field(0, 3);
@@ -1955,9 +2020,9 @@ mod tests {
             &target_field,
             state.position_matrix().borrow(),
         );
-        assert!(state.piece_can_reach_target_field(&chess_move));
+        assert!(state.piece_can_reach_target_field(&chess_move).unwrap());
 
-        // two down, one to the side (should return false)
+        // two down, one to the side
         let start_field = Field(7, 3);
         let target_field = Field(5, 4);
         let chess_move = Move::new(
@@ -1965,9 +2030,9 @@ mod tests {
             &target_field,
             state.position_matrix().borrow(),
         );
-        assert!(!state.piece_can_reach_target_field(&chess_move));
+        assert!(state.piece_can_reach_target_field(&chess_move) == Err(MoveError::PieceCantReachTarget));
 
-        // four to the side three down (should return false)
+        // four to the side three down
         let start_field = Field(7, 3);
         let target_field = Field(3, 0);
         let chess_move = Move::new(
@@ -1975,7 +2040,7 @@ mod tests {
             &target_field,
             state.position_matrix().borrow(),
         );
-        assert!(!state.piece_can_reach_target_field(&chess_move));
+        assert!(state.piece_can_reach_target_field(&chess_move) == Err(MoveError::PieceCantReachTarget));
     }
 
     // this test is pretty much a dummy, since the method always returns true
@@ -2220,7 +2285,11 @@ mod tests {
             String::from("r1bqkbnr/ppp2ppp/2np4/1B2p3/4P3/2N2N2/PPPP1PPP/R1BQK2R b KQkq - 1 4");
         let state = State::load_game_from_fen(fen_string);
         let chess_move = Move::new(&Field(5, 2), &Field(3, 3), state.position_matrix().borrow());
-        assert!(!state.is_move_legal(&chess_move));
+        assert!(match state.is_move_legal(&chess_move) {
+            Ok(_) => false,
+            Err(e) if e == MoveError::PieceIsPinned => true,
+            Err(_) => false,
+        });
     }
 
     #[test]
@@ -2229,7 +2298,7 @@ mod tests {
             String::from("r2qkbnr/pppb1ppp/2np4/1B2p3/4P3/2N2N1P/PPPP1PP1/R1BQK2R b KQkq - 0 5");
         let state = State::load_game_from_fen(fen_string);
         let chess_move = Move::new(&Field(5, 2), &Field(3, 3), state.position_matrix().borrow());
-        assert!(state.is_move_legal(&chess_move));
+        assert!(state.is_move_legal(&chess_move).unwrap());
     }
 
     #[test]
@@ -2238,7 +2307,11 @@ mod tests {
             String::from("r2qkbnr/pppb1ppp/3p4/1B2p3/3nP3/2N2N1P/PPPP1PP1/R1BQK2R w KQkq - 1 6");
         let state = State::load_game_from_fen(fen_string);
         let chess_move = Move::new(&Field(0, 4), &Field(1, 4), state.position_matrix().borrow());
-        assert!(!state.is_move_legal(&chess_move));
+        assert!(match state.is_move_legal(&chess_move) {
+            Ok(_) => false,
+            Err(e) if e == MoveError::MovingIntoCheck => true,
+            Err(_) => false,
+        });
     }
 
     #[test]
@@ -2247,7 +2320,7 @@ mod tests {
             String::from("r2qkbnr/pppb1ppp/2np4/1B2p3/4P3/2N2N2/PPPP1PPP/R1BQK2R w KQkq - 2 5");
         let state = State::load_game_from_fen(fen_string);
         let chess_move = Move::new(&Field(0, 4), &Field(1, 4), state.position_matrix().borrow());
-        assert!(state.is_move_legal(&chess_move));
+        assert!(state.is_move_legal(&chess_move).unwrap());
     }
 
     #[test]
@@ -2450,9 +2523,13 @@ mod tests {
         // the left pawn moved the move before
         // en passant is only possible on f6
         let chess_move = Move::new(&Field(4, 4), &Field(5, 3), state.position_matrix().borrow());
-        assert!(!state.is_move_legal(&chess_move));
+        assert!(match state.is_move_legal(&chess_move) {
+            Ok(_) => false,
+            Err(e) if e == MoveError::PieceCantReachTarget => true,
+            Err(_) => false,
+        });
         let chess_move = Move::new(&Field(4, 4), &Field(5, 5), state.position_matrix().borrow());
-        assert!(state.is_move_legal(&chess_move));
+        assert!(state.is_move_legal(&chess_move).unwrap());
 
         // check whether the en passant move execution works
         let new_state = state.execute_move(&chess_move);
@@ -2486,7 +2563,7 @@ mod tests {
             String::from("rnbq1rk1/1p1pppbp/5np1/2p5/pPB1P3/2NP1N2/P1PB1PPP/R2Q1RK1 b - b3 0 8");
         let state = State::load_game_from_fen(fen_string);
         let chess_move = Move::new(&Field(3, 0), &Field(2, 1), state.position_matrix().borrow());
-        assert!(state.is_move_legal(&chess_move));
+        assert!(state.is_move_legal(&chess_move).unwrap());
         let new_state = state.execute_move(&chess_move);
         new_state
             .position()
