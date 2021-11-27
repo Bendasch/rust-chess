@@ -30,14 +30,13 @@ const BLACK_PAWN: char = '\u{2659}';
 */
 #[rustfmt::skip]
 pub fn run(fen: Option<String>) {
-    use MoveError::*;
-
     // start from a provided or an initial position
-    let mut game: LinkedList<State> = LinkedList::new();
-    game.push_back(State::new(fen));
-
+    let mut active_states: LinkedList<State> = LinkedList::new();
+    let mut inactive_states: LinkedList<State> = LinkedList::new();
+    active_states.push_back(State::new(fen));
+    
     loop {
-        let current_state = game.back().unwrap();
+        let current_state = active_states.back().unwrap();
 
         // start by showing the current board state
         draw_board(current_state.position().borrow());
@@ -65,28 +64,28 @@ pub fn run(fen: Option<String>) {
         io::stdin().read_line(&mut move_string).unwrap();
 
         // execute the move according to the players input.
-        // the resulting state is appended to the game list.
-        let new_state = State::perform_turn_from_input(move_string, current_state);
-
-        match new_state {
-            Ok(new_state) => {
-                drop(current_state);
-                game.push_back(new_state)
+        // the resulting state is appended to the active_states list.
+        match move_string.trim() {
+            ">" => {
+                if inactive_states.len() == 0 {
+                    println!("No moves to redo!");
+                    continue;
+                }
+                let next_state = inactive_states.pop_back().unwrap();
+                active_states.push_back(next_state);
+            } 
+            "<" => {
+                if active_states.len() == 1 {
+                    println!("No moves to undo!");
+                    continue;
+                }
+                let next_state = active_states.pop_back().unwrap();
+                inactive_states.push_back(next_state);
             }
-            Err(OutOfBounds)           => println!("Please stay within the bounds 1-8!"),
-            Err(NoneDigitEntered)      => println!("Please only enter digits!"),
-            Err(InvalidNumberOfDigits) => println!("Please enter four digits!"),
-            Err(NoPieceSelected)       => println!("No piece selected!"),
-            Err(WrongColorSelected)    => println!("Enemy piece selected!"),
-            Err(PieceCantReachTarget)  => println!("The selected piece can't reach this field!"),
-            Err(OwnPieceOnTarget)      => println!("One of your pieces already is on this field!"),
-            Err(NoPathToTarget)        => println!("The selected piece has no path to this field!"),
-            Err(PieceIsPinned)         => println!("The selected piece is pinned!"),
-            Err(MovingIntoCheck)       => println!("You would be moving into check!"),
-            Err(NotMovingOutOfCheck)   => println!("You need to move out of check!"),
-            Err(CastlingThroughCheck)  => println!("You would be castling through check!"),
-            Err(CastlingNotAvailable)  => println!("You can't castle anymore!"),
-            Err(None)                  => println!("Invalid move!"),
+            _ => {
+                let new_state = State::perform_turn_from_input(move_string, current_state);
+                handle_state(new_state, &mut active_states, &mut inactive_states);
+            }
         }
     }
 }

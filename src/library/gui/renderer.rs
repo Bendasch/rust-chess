@@ -44,7 +44,7 @@ pub struct Glfw {
 
 pub struct GameState {
     pub selected_field: Option<(usize, usize)>,
-    pub game: LinkedList<State>,
+    pub game: (LinkedList<State>, LinkedList<State>),
 }
 
 impl Renderer {
@@ -87,7 +87,7 @@ impl Renderer {
         // "bind" the game state to the glfw window
         let game_state = Arc::new(RwLock::new(GameState {
             selected_field: None,
-            game,
+            game: (game, LinkedList::new()),
         }));
 
         glfwSetWindowUserPointer(glfw.window, Arc::as_ptr(&game_state) as *const c_void);
@@ -186,7 +186,7 @@ impl Renderer {
         let b_verts = Renderer::get_board_vertices(&game_state.selected_field);
         self.v_buffer.buffer_sub_data(&b_verts, b_verts.len(), 0);
         unsafe {
-            let pos_matrix = game_state.game.back().unwrap().position_matrix().borrow();
+            let pos_matrix = game_state.game.0.back().unwrap().position_matrix().borrow();
             let (p_verts, p_inds) = Renderer::get_piece_vertices_and_indices(pos_matrix);
             self.v_buffer.buffer_sub_data(&p_verts, p_verts.len(), 324);
             self.i_buffer.bind();
@@ -373,17 +373,18 @@ pub unsafe extern "C" fn click_callback(
     action: c_int,
     _mods: c_int,
 ) {
-    if action == GLFW_PRESS {
-        match button {
-            GLFW_MOUSE_BUTTON_LEFT => {
-                let (x, y) = Renderer::get_clicked_field(window);
-                toggle_field(glfwGetWindowUserPointer(window), (x, y));
-            }
-            GLFW_MOUSE_BUTTON_RIGHT => {
-                deselected_field(glfwGetWindowUserPointer(window));
-            }
-            _ => {}
+    if action != GLFW_PRESS {
+        return;
+    }
+    match button {
+        GLFW_MOUSE_BUTTON_LEFT => {
+            let (x, y) = Renderer::get_clicked_field(window);
+            toggle_field(glfwGetWindowUserPointer(window), (x, y));
         }
+        GLFW_MOUSE_BUTTON_RIGHT => {
+            deselected_field(glfwGetWindowUserPointer(window));
+        }
+        _ => {}
     }
 }
 
@@ -411,15 +412,16 @@ pub unsafe fn toggle_field(pointer: *const c_void, value: (usize, usize)) {
     let return_value = match game_state.selected_field {
         Some(inner) if inner == value => None,
         Some(inner) if inner != value => {
+            let game = &mut game_state.game;
             let mut move_string = String::new();
             move_string.push(char::from_digit(inner.1 as u32 + 1, 10).unwrap());
             move_string.push(char::from_digit(inner.0 as u32 + 1, 10).unwrap());
             move_string.push(char::from_digit(value.1 as u32 + 1, 10).unwrap());
             move_string.push(char::from_digit(value.0 as u32 + 1, 10).unwrap());
-            let current_state = game_state.game.back().unwrap();
+            let current_state = game.0.back().unwrap();
             let new_state = State::perform_turn_from_input(move_string, current_state);
             drop(current_state);
-            game_state.game.push_back(new_state.unwrap());
+            handle_state(new_state, &mut game.0, &mut game.1);
             None
         }
         _ => Some(value),

@@ -26,8 +26,9 @@ The game can be played by the user by entering a move in the form:
 For example, the starting move "e4" would be entered as "2545". In the future parsing of moves in more intuitive
 notation may be supported.
 
+In order to undo / redo moves, type "<" / ">".
+
 # To do
-- [ ] Proper error propagation to and handling in UI
-- [ ] Revert moves in UI
+- [ ] Revert moves in GUI (glfw key callbacks)
 - [ ] Save / export FEN strings
 - [ ] AI making legal moves

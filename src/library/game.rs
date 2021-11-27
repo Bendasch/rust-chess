@@ -1,5 +1,5 @@
 pub use std::cell::Ref;
-use std::{cell::RefCell, cmp::max, cmp::PartialEq};
+use std::{cell::RefCell, cmp::max, cmp::PartialEq, collections::LinkedList};
 
 pub enum GameOver {
     No,
@@ -84,6 +84,31 @@ impl PieceInstance {
     }
 }
 
+
+pub fn handle_state(new_state: Result<State, MoveError>, active_states: &mut LinkedList<State>, inactive_states: &mut LinkedList<State>) {
+    use MoveError::*;
+    match new_state {
+        Ok(new_state) => {
+            active_states.push_back(new_state);
+            inactive_states.clear();
+        },
+        Err(OutOfBounds) => println!("Please stay within the bounds 1-8!"),
+        Err(NoneDigitEntered) => println!("Please only enter digits!"),
+        Err(InvalidNumberOfDigits) => println!("Please enter four digits!"),
+        Err(NoPieceSelected) => println!("No piece selected!"),
+        Err(WrongColorSelected) => println!("Enemy piece selected!"),
+        Err(PieceCantReachTarget) => println!("The selected piece can't reach this field!"),
+        Err(OwnPieceOnTarget) => println!("One of your pieces already is on this field!"),
+        Err(NoPathToTarget) => println!("The selected piece has no path to this field!"),
+        Err(PieceIsPinned) => println!("The selected piece is pinned!"),
+        Err(MovingIntoCheck) => println!("You would be moving into check!"),
+        Err(NotMovingOutOfCheck) => println!("You need to move out of check!"),
+        Err(CastlingThroughCheck) => println!("You would be castling through check!"),
+        Err(CastlingNotAvailable) => println!("You can't castle anymore!"),
+        Err(None) => println!("Invalid move!"),
+    }
+}
+
 #[derive(Debug)]
 pub struct Move {
     pub piece: Piece,
@@ -154,7 +179,7 @@ impl Move {
     }
 
     #[rustfmt::skip]
-    pub fn parse_player_input(player_input: String) -> Result<(Field, Field), MoveError> {
+    pub fn parse_move_input(player_input: String) -> Result<(Field, Field), MoveError> {
         let move_chars: Vec<char> = player_input
             .chars()
             .filter(|c| *c != '\n' && *c != '\r')
@@ -620,7 +645,7 @@ impl<'a> State {
     ) -> Result<State, MoveError> {
 
         // get fields from player input
-        let (start_field, target_field) = match Move::parse_player_input(player_input) {
+        let (start_field, target_field) = match Move::parse_move_input(player_input) {
             Ok((start_field, target_field)) => (start_field, target_field),
             Err(e) => return Err(e),
         };
