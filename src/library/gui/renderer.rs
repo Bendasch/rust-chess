@@ -158,11 +158,13 @@ impl Renderer {
         self.bind_textures();
         self.bind_board_state();
         self.draw_call();
-        // TO DO: Draw who to move.
     }
 
+    pub unsafe fn get_board_transformation() -> Mat4 {
+        translate(0.1, 0.1, 0.0) * scale(0.6, 0.8, 1.0)
+    }
     unsafe fn set_view(&mut self) {
-        let mvp = ortho(0.0, WIDTH, 0.0, HEIGHT, -0.5, 0.5);
+        let mvp = ortho(0.0, 1.0, 0.0, 1.0, -0.5, 0.5) * Renderer::get_board_transformation();
         self.shader.bind();
         self.shader.set_uniform_mat4f("u_MVP", mvp);
         gl!(self.gl.viewport(0, 0, WIDTH as i32, HEIGHT as i32));
@@ -228,7 +230,7 @@ impl Renderer {
     }
 
     unsafe fn get_vertex(rank: i32, file: i32, corner: i32) -> Vertex {
-        let position = Position(rank as f32 * WIDTH / 8.0, file as f32 * HEIGHT / 8.0);
+        let position = Position(rank as f32 * 1.0 / 8.0, file as f32 * 1.0 / 8.0);
 
         let texture_coords = match corner {
             1 => TextureCoords(0.0, 0.0),
@@ -301,22 +303,22 @@ impl Renderer {
 
                 let (u, v) = Renderer::get_texture_coords_from_piece(piece);
                 vertices.push(Vertex {
-                    position: Position(j as f32 * WIDTH / 8.0, i as f32 * HEIGHT / 8.0),
+                    position: Position(j as f32 * 1.0 / 8.0, i as f32 * 1.0 / 8.0),
                     texture_coords: TextureCoords(u, v),
                     texture_id: 2.0,
                 });
                 vertices.push(Vertex {
-                    position: Position((j + 1) as f32 * WIDTH / 8.0, i as f32 * HEIGHT / 8.0),
+                    position: Position((j + 1) as f32 * 1.0 / 8.0, i as f32 * 1.0 / 8.0),
                     texture_coords: TextureCoords(u + (1.0 / 6.0), v),
                     texture_id: 2.0,
                 });
                 vertices.push(Vertex {
-                    position: Position((j + 1) as f32 * WIDTH / 8.0, (i + 1) as f32 * HEIGHT / 8.0),
+                    position: Position((j + 1) as f32 * 1.0 / 8.0, (i + 1) as f32 * 1.0 / 8.0),
                     texture_coords: TextureCoords(u + (1.0 / 6.0), v + 0.5),
                     texture_id: 2.0,
                 });
                 vertices.push(Vertex {
-                    position: Position(j as f32 * WIDTH / 8.0, (i + 1) as f32 * HEIGHT / 8.0),
+                    position: Position(j as f32 * 1.0 / 8.0, (i + 1) as f32 * 1.0 / 8.0),
                     texture_coords: TextureCoords(u, v + 0.5),
                     texture_id: 2.0,
                 });
@@ -353,10 +355,26 @@ impl Renderer {
     }
 
     pub unsafe fn get_clicked_field(window: *const GLFWwindow) -> (usize, usize) {
-        let (xpos, ypos) = Renderer::get_cursor_position(window);
+        let (xpos, ypos) = Renderer::get_cursor_position(window); // WIDTH x HEIGHT
+        let x = xpos / WIDTH; // 1 x 1
+        let y = ypos / HEIGHT; // 1 x 1
+        let position = Renderer::get_board_transformation()
+            .transpose()
+            .inverse()
+            .unwrap()
+            * vec4(x, y, 0.0, 1.0);
+
+        // scale board position UP to 8x8
+        // check bounds such that only clicks on the board are processed!
+        println!(
+            "xpos: {}, ypos: {}, x: {}, y: {}, pos1: {}, pos2: {}, ",
+            xpos, ypos, x, y, position.x, position.y
+        );
+        /*
         let x = xpos / WIDTH * 8.0;
         let y = ypos / HEIGHT * 8.0;
-        (x as usize, y as usize)
+        */
+        ((position.x * 8.0) as usize, (position.y * 8.0) as usize)
     }
 
     pub unsafe fn get_cursor_position(window: *const GLFWwindow) -> (f32, f32) {

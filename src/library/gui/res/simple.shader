@@ -16,7 +16,7 @@ void main()
     gl_Position = u_MVP * a_Position;
     v_TexCoord = a_TexCoord;
     v_TexIndex = a_TexIndex;
-}
+}   
 
 #shader fragment
 #version 330 core 
