@@ -1,5 +1,5 @@
 use crate::gl;
-use crate::library::gui::{maths::Mat4, opengl::*, utils::*};
+use crate::library::gui::{maths::Matrix4, opengl::*, utils::*};
 use libc::{c_char, c_uint};
 use std::{
     collections::HashMap,
@@ -169,13 +169,13 @@ impl Shader {
         }
     }
 
-    pub fn set_uniform_mat4f(&mut self, name: &str, mat: Mat4) {
+    pub fn set_uniform_mat4f(&mut self, name: &str, mat: Matrix4<f32>) {
         unsafe {
             self.cache_uniform_location(name);
             let location = self.get_uniform_location(name);
             gl!(self
                 .gl
-                .uniform_matrix_4fv(*location, 1, GL_FALSE, &mat.c0[0] as *const GLfloat));
+                .uniform_matrix_4fv(*location, 1, GL_FALSE, &mat[(0, 0)] as *const GLfloat));
         }
     }
 

@@ -1,4 +1,3 @@
-extern crate glm;
 use crate::gl;
 use crate::library::gui::{opengl::*, utils::*};
 use libc::{c_uint, c_void};

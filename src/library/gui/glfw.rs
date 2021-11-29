@@ -31,6 +31,7 @@ extern "C" {
     pub fn glfwWindowShouldClose(window: *mut GLFWwindow) -> c_int;
     pub fn glfwSwapBuffers(window: *mut GLFWwindow);
     pub fn glfwPollEvents();
+    pub fn glfwWaitEvents();
     pub fn glfwTerminate();
     pub fn glfwSwapInterval(interval: c_int);
     pub fn glfwSetMouseButtonCallback(

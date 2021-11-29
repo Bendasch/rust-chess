@@ -141,6 +141,13 @@ impl Renderer {
         self.glfw.window
     }
 
+    pub fn check_game_over(&self) -> GameOver {
+        let game_state = self.game_state.read().unwrap();
+        let game_over = game_state.game.0.back().unwrap().check_game_over();
+        drop(game_state);
+        game_over
+    }
+
     pub fn clear(&self) {
         self.v_array.unbind();
         self.v_buffer.unbind();
@@ -160,7 +167,7 @@ impl Renderer {
         self.draw_call();
     }
 
-    pub unsafe fn get_board_transformation() -> Mat4 {
+    pub unsafe fn get_board_transformation() -> Matrix4<f32> {
         translate(0.1, 0.1, 0.0) * scale(0.6, 0.8, 1.0)
     }
     unsafe fn set_view(&mut self) {
@@ -356,25 +363,26 @@ impl Renderer {
 
     pub unsafe fn get_clicked_field(window: *const GLFWwindow) -> (usize, usize) {
         let (xpos, ypos) = Renderer::get_cursor_position(window); // WIDTH x HEIGHT
-        let x = xpos / WIDTH; // 1 x 1
-        let y = ypos / HEIGHT; // 1 x 1
-        let position = Renderer::get_board_transformation()
-            .transpose()
-            .inverse()
-            .unwrap()
-            * vec4(x, y, 0.0, 1.0);
+        let view_click_position = Vector4::new(xpos / WIDTH, ypos / HEIGHT, 0.0, 1.0);
+        let mut board_transformation = Renderer::get_board_transformation();
+        if !board_transformation.try_inverse_mut() {
+            panic!("Could not invert board transformation")
+        };
+        let mut board_click_position = board_transformation * view_click_position;
 
-        // scale board position UP to 8x8
-        // check bounds such that only clicks on the board are processed!
-        println!(
-            "xpos: {}, ypos: {}, x: {}, y: {}, pos1: {}, pos2: {}, ",
-            xpos, ypos, x, y, position.x, position.y
-        );
-        /*
-        let x = xpos / WIDTH * 8.0;
-        let y = ypos / HEIGHT * 8.0;
-        */
-        ((position.x * 8.0) as usize, (position.y * 8.0) as usize)
+        // set the position to some high out of bounds value if there was
+        // a click to the left or the bottom of the board.
+        // this is a somewhat hacky way to make sure that nothing happens on a click.
+        if board_click_position.x < 0. {
+            board_click_position.x = 999.;
+        }
+        if board_click_position.y < 0. {
+            board_click_position.y = 999.;
+        }
+        (
+            (board_click_position.x * 8.0) as usize,
+            (board_click_position.y * 8.0) as usize,
+        )
     }
 
     pub unsafe fn get_cursor_position(window: *const GLFWwindow) -> (f32, f32) {
@@ -425,6 +433,9 @@ pub extern "C" fn framebuffer_size_callback(
 }
 
 pub unsafe fn toggle_field(pointer: *const c_void, value: (usize, usize)) {
+    if value.0 > 7 || value.1 > 7 {
+        return;
+    }
     let game_state_arc = Arc::from_raw(pointer as *const RwLock<GameState>);
     let mut game_state = game_state_arc.write().unwrap();
     let return_value = match game_state.selected_field {
