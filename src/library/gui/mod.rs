@@ -13,13 +13,9 @@ use crate::library::{
     game::*,
     gui::{glfw::*, renderer::*, utils::print_opengl_version},
 };
-use std::collections::LinkedList;
 
 pub unsafe fn run(fen: Option<String>) {
-    let mut game: LinkedList<State> = LinkedList::new();
-    game.push_back(State::new(fen));
-
-    let mut renderer: Renderer = Renderer::init(game);
+    let mut renderer: Renderer = Renderer::init(fen);
     let mut game_active = true;
 
     print_opengl_version(&renderer.gl);

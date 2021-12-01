@@ -36,19 +36,21 @@ pub struct Renderer {
     textures: Vec<Texture>,
 }
 
+pub enum UiElement {
+    None,
+    Field(usize, usize),
+    BackwardButton,
+    ForwardButton,
+}
+
 pub struct Glfw {
     monitor: *mut GLFWmonitor,
     share: *mut GLFWwindow,
     window: *mut GLFWwindow,
 }
 
-pub struct GameState {
-    pub selected_field: Option<(usize, usize)>,
-    pub game: (LinkedList<State>, LinkedList<State>),
-}
-
 impl Renderer {
-    pub unsafe fn init(game: LinkedList<State>) -> Renderer {
+    pub unsafe fn init(fen: Option<String>) -> Renderer {
         let glfw = Renderer::init_glfw().expect("Failed to initialize GLFW");
         let gl = Rc::new(GL::bind());
 
@@ -98,9 +100,12 @@ impl Renderer {
         Renderer::set_blend_func(Rc::clone(&gl));
 
         // "bind" the game state to the glfw window
+        let mut active_states: LinkedList<State> = LinkedList::new();
+        active_states.push_back(State::new(fen));
         let game_state = Arc::new(RwLock::new(GameState {
             selected_field: None,
-            game: (game, LinkedList::new()),
+            active_states,
+            inactive_states: LinkedList::new(),
         }));
 
         glfwSetWindowUserPointer(glfw.window, Arc::as_ptr(&game_state) as *const c_void);
@@ -156,7 +161,7 @@ impl Renderer {
 
     pub fn check_game_over(&self) -> GameOver {
         let game_state = self.game_state.read().unwrap();
-        let game_over = game_state.game.0.back().unwrap().check_game_over();
+        let game_over = game_state.active_states.back().unwrap().check_game_over();
         drop(game_state);
         game_over
     }
@@ -210,7 +215,12 @@ impl Renderer {
         let b_verts = Renderer::get_board_vertices(&game_state.selected_field);
         self.v_buffer.buffer_sub_data(&b_verts, b_verts.len(), 0);
         unsafe {
-            let pos_matrix = game_state.game.0.back().unwrap().position_matrix().borrow();
+            let pos_matrix = game_state
+                .active_states
+                .back()
+                .unwrap()
+                .position_matrix()
+                .borrow();
             let (p_verts, p_inds) = Renderer::get_piece_vertices_and_indices(pos_matrix);
             self.v_buffer.buffer_sub_data(&p_verts, p_verts.len(), 324);
             self.i_buffer.bind();
@@ -422,28 +432,39 @@ impl Renderer {
         (u, v)
     }
 
-    pub unsafe fn get_clicked_field(window: *const GLFWwindow) -> (usize, usize) {
+    pub unsafe fn get_clicked_element(window: *const GLFWwindow) -> UiElement {
         let (xpos, ypos) = Renderer::get_cursor_position(window); // WIDTH x HEIGHT
         let view_click_position = Vector4::new(xpos / WIDTH, ypos / HEIGHT, 0.0, 1.0);
         let mut board_transformation = Renderer::get_board_transformation();
         if !board_transformation.try_inverse_mut() {
             panic!("Could not invert board transformation")
         };
-        let mut board_click_position = board_transformation * view_click_position;
+        let board_click_position = board_transformation * view_click_position;
 
-        // set the position to some high out of bounds value if there was
-        // a click to the left or the bottom of the board.
-        // this is a somewhat hacky way to make sure that nothing happens on a click.
-        if board_click_position.x < 0. {
-            board_click_position.x = 999.;
+        if board_click_position.x >= 0.
+            && board_click_position.x <= 1.
+            && board_click_position.y >= 0.
+            && board_click_position.y <= 1.
+        {
+            return UiElement::Field(
+                (board_click_position.x * 8.0) as usize,
+                (board_click_position.y * 8.0) as usize,
+            );
         }
-        if board_click_position.y < 0. {
-            board_click_position.y = 999.;
+
+        if view_click_position.y < 0.42 || view_click_position.y > 0.58 {
+            return UiElement::None;
         }
-        (
-            (board_click_position.x * 8.0) as usize,
-            (board_click_position.y * 8.0) as usize,
-        )
+
+        if view_click_position.x >= 0.75 && view_click_position.x <= 0.83 {
+            return UiElement::BackwardButton;
+        }
+
+        if view_click_position.x >= 0.87 && view_click_position.x <= 0.95 {
+            return UiElement::ForwardButton;
+        }
+
+        UiElement::None
     }
 
     pub unsafe fn get_cursor_position(window: *const GLFWwindow) -> (f32, f32) {
@@ -465,8 +486,16 @@ pub unsafe extern "C" fn click_callback(
     }
     match button {
         GLFW_MOUSE_BUTTON_LEFT => {
-            let (x, y) = Renderer::get_clicked_field(window);
-            toggle_field(glfwGetWindowUserPointer(window), (x, y));
+            let ui_element = Renderer::get_clicked_element(window);
+            match ui_element {
+                UiElement::Field(x, y) => {
+                    toggle_field(glfwGetWindowUserPointer(window), (x, y));
+                }
+                UiElement::BackwardButton | UiElement::ForwardButton => {
+                    scroll_state(glfwGetWindowUserPointer(window), ui_element);
+                }
+                _ => {}
+            }
         }
         GLFW_MOUSE_BUTTON_RIGHT => {
             deselected_field(glfwGetWindowUserPointer(window));
@@ -493,25 +522,43 @@ pub extern "C" fn framebuffer_size_callback(
     }
 }
 
+pub unsafe fn scroll_state(game_state_ptr: *const c_void, button: UiElement) {
+    let game_state_arc = Arc::from_raw(game_state_ptr as *const RwLock<GameState>);
+    let mut game_state = game_state_arc.write().unwrap();
+    match button {
+        UiElement::BackwardButton => {
+            if game_state.active_states.len() > 1 {
+                let last_active_state = game_state.active_states.pop_back().unwrap();
+                game_state.inactive_states.push_back(last_active_state);
+            }
+        }
+        UiElement::ForwardButton => {
+            if game_state.inactive_states.len() > 0 {
+                let last_inactive_state = game_state.inactive_states.pop_back().unwrap();
+                game_state.active_states.push_back(last_inactive_state);
+            }
+        }
+        _ => panic!("There should only be forward and backward buttons at this point."),
+    };
+    drop(game_state);
+    forget(game_state_arc);
+}
+
 pub unsafe fn toggle_field(pointer: *const c_void, value: (usize, usize)) {
-    if value.0 > 7 || value.1 > 7 {
-        return;
-    }
     let game_state_arc = Arc::from_raw(pointer as *const RwLock<GameState>);
     let mut game_state = game_state_arc.write().unwrap();
     let return_value = match game_state.selected_field {
         Some(inner) if inner == value => None,
         Some(inner) if inner != value => {
-            let game = &mut game_state.game;
             let mut move_string = String::new();
             move_string.push(char::from_digit(inner.1 as u32 + 1, 10).unwrap());
             move_string.push(char::from_digit(inner.0 as u32 + 1, 10).unwrap());
             move_string.push(char::from_digit(value.1 as u32 + 1, 10).unwrap());
             move_string.push(char::from_digit(value.0 as u32 + 1, 10).unwrap());
-            let current_state = game.0.back().unwrap();
+            let current_state = game_state.active_states.back().unwrap();
             let new_state = State::perform_turn_from_input(move_string, current_state);
             drop(current_state);
-            handle_state(new_state, &mut game.0, &mut game.1);
+            handle_state(new_state, &mut game_state);
             None
         }
         _ => Some(value),

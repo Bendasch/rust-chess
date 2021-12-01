@@ -84,13 +84,18 @@ impl PieceInstance {
     }
 }
 
+pub struct GameState {
+    pub selected_field: Option<(usize, usize)>,
+    pub active_states: LinkedList<State>,
+    pub inactive_states: LinkedList<State>,
+}
 
-pub fn handle_state(new_state: Result<State, MoveError>, active_states: &mut LinkedList<State>, inactive_states: &mut LinkedList<State>) {
+pub fn handle_state(new_state: Result<State, MoveError>, game: &mut GameState) {
     use MoveError::*;
     match new_state {
         Ok(new_state) => {
-            active_states.push_back(new_state);
-            inactive_states.clear();
+            game.active_states.push_back(new_state);
+            game.inactive_states.clear();
         },
         Err(OutOfBounds) => println!("Please stay within the bounds 1-8!"),
         Err(NoneDigitEntered) => println!("Please only enter digits!"),

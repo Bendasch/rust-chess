@@ -30,13 +30,11 @@ const BLACK_PAWN: char = '\u{2659}';
 */
 #[rustfmt::skip]
 pub fn run(fen: Option<String>) {
-    // start from a provided or an initial position
-    let mut active_states: LinkedList<State> = LinkedList::new();
-    let mut inactive_states: LinkedList<State> = LinkedList::new();
-    active_states.push_back(State::new(fen));
+    let mut game = GameState { selected_field: None, active_states: LinkedList::new(), inactive_states: LinkedList::new() };
+    game.active_states.push_back(State::new(fen));
     
     loop {
-        let current_state = active_states.back().unwrap();
+        let current_state = game.active_states.back().unwrap();
 
         // start by showing the current board state
         draw_board(current_state.position().borrow());
@@ -67,24 +65,24 @@ pub fn run(fen: Option<String>) {
         // the resulting state is appended to the active_states list.
         match move_string.trim() {
             ">" => {
-                if inactive_states.len() == 0 {
+                if game.inactive_states.len() == 0 {
                     println!("No moves to redo!");
                     continue;
                 }
-                let next_state = inactive_states.pop_back().unwrap();
-                active_states.push_back(next_state);
+                let next_state = game.inactive_states.pop_back().unwrap();
+                game.active_states.push_back(next_state);
             } 
             "<" => {
-                if active_states.len() == 1 {
+                if game.active_states.len() == 1 {
                     println!("No moves to undo!");
                     continue;
                 }
-                let next_state = active_states.pop_back().unwrap();
-                inactive_states.push_back(next_state);
+                let next_state = game.active_states.pop_back().unwrap();
+                game.inactive_states.push_back(next_state);
             }
             _ => {
                 let new_state = State::perform_turn_from_input(move_string, current_state);
-                handle_state(new_state, &mut active_states, &mut inactive_states);
+                handle_state(new_state, &mut game);
             }
         }
     }
