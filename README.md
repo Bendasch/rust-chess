@@ -29,6 +29,5 @@ notation may be supported.
 In order to undo / redo moves, type `<` / `>`.
 
 # To do
-- [ ] Revert moves in GUI (glfw key callbacks)
 - [ ] Save / export FEN strings
 - [ ] AI making legal moves
